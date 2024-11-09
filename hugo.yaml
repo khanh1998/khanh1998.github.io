@@ -37,21 +37,21 @@ params:
   comments: false
   hidemeta: false
   hideSummary: false
-  showtoc: false
-  tocopen: false
+  showtoc: true
+  tocopen: true
   social: true
 
   assets:
     # disableHLJS: true # to disable highlight.js
     # disableFingerprinting: true
-    favicon: "<link / abs url>"
+    favicon: "/favicon.ico"
     favicon16x16: "<link / abs url>"
     favicon32x32: "<link / abs url>"
     apple_touch_icon: "<link / abs url>"
     safari_pinned_tab: "<link / abs url>"
 
   label:
-    text: "Home"
+    text: "Khanh's Blog"
     icon: /apple-touch-icon.png
     iconHeight: 35
 
@@ -73,15 +73,17 @@ params:
   # home-info mode
   homeInfoParams:
     Title: "Hi there \U0001F44B"
-    Content: Welcome to my blog
+    Content: Based in Vietnam, I’m a backend-focused software engineer with expertise in Go and Postgres. Passionate about databases and distributed systems, I started this blog to document my learning journey and share insights. I hope my experiences can support others navigating similar paths in tech.
 
   socialIcons:
     - name: x
-      url: "https://x.com/"
+      url: "https://x.com/chelskivn29"
     - name: stackoverflow
-      url: "https://stackoverflow.com"
+      url: "https://stackoverflow.com/khanh1998"
     - name: github
-      url: "https://github.com/"
+      url: "https://github.com/khanh1998"
+    - name: linkedin
+      url: "https://www.linkedin.com/in/bui-quoc-khanh"
 
   analytics:
     google:
@@ -97,7 +99,7 @@ params:
     hiddenInSingle: true # hide on single page
 
   editPost:
-    URL: "https://github.com/<path_to_repo>/content"
+    URL: "https://github.com/khanh1998/khanh1998.github.io/blob/main/content"
     Text: "Suggest Changes" # edit text
     appendFilePath: true # to append file path to Edit link
 
@@ -112,6 +114,13 @@ params:
     minMatchCharLength: 0
     limit: 10 # refer: https://www.fusejs.io/api/methods.html#search
     keys: ["title", "permalink", "summary", "content"]
+
+outputs:
+  home:
+    - HTML
+    - RSS
+    - JSON # necessary for search
+
 menu:
   main:
     - identifier: categories

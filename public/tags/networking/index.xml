@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Networking on Khanh&#39;s Blog</title>
+    <link>http://localhost:1313/tags/networking/</link>
+    <description>Recent content in Networking on Khanh&#39;s Blog</description>
+    <image>
+      <title>Khanh&#39;s Blog</title>
+      <url>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
+      <link>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
+    </image>
+    <generator>Hugo -- 0.136.5</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 09 Nov 2024 19:57:13 +0700</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/networking/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>What happens when you use a browser to access google.com</title>
+      <link>http://localhost:1313/posts/what-happen-when-you-use-a-browser-to-access-google/</link>
+      <pubDate>Sat, 09 Nov 2024 19:57:13 +0700</pubDate>
+      <guid>http://localhost:1313/posts/what-happen-when-you-use-a-browser-to-access-google/</guid>
+      <description>&lt;p&gt;So this is just a quick recap of what I have learned about networking&lt;/p&gt;
+&lt;p&gt;First, you have to connect your computer to the local network. Your computer then will be assigned a local IP by a &lt;strong&gt;DHCP&lt;/strong&gt; server (Dynamic Host Configuration Protocol), you cannot use that local IP to talk to the outside network. All the devices in the same local network will use the IP of the gateway to talk to the internet, sometimes it’s called public IP. The protocol to map from local address to public address is called &lt;strong&gt;NAT&lt;/strong&gt; (Network Address Translation).&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>My First Post</title>
+      <link>http://localhost:1313/posts/my-first-post/</link>
+      <pubDate>Wed, 30 Oct 2024 13:27:45 +0700</pubDate>
+      <guid>http://localhost:1313/posts/my-first-post/</guid>
+      <description>&lt;h2 id=&#34;introduction&#34;&gt;Introduction&lt;/h2&gt;
+&lt;p&gt;This is &lt;strong&gt;bold&lt;/strong&gt; text, and this is &lt;em&gt;emphasized&lt;/em&gt; text.&lt;/p&gt;
+&lt;p&gt;Visit the &lt;a href=&#34;https://gohugo.io&#34;&gt;Hugo&lt;/a&gt; website!&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>
