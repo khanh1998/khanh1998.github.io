@@ -1,6 +1,6 @@
 ---
-date: '2024-11-09T19:57:13+07:00'
-draft: true
+date: '2021-12-07T19:57:13+07:00'
+draft: false
 title: 'What happens when you use a browser to access google.com'
 tags: ['networking']
 ---

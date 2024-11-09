@@ -1,6 +1,6 @@
 ---
-date: '2024-11-09T20:12:19+07:00'
-draft: true
+date: '2021-12-08T20:12:19+07:00'
+draft: false
 title: 'ACID'
 tags: ['database']
 ---
