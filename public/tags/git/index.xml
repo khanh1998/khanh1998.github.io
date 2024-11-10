@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Git on Khanh&#39;s Blog</title>
+    <link>http://localhost:1313/tags/git/</link>
+    <description>Recent content in Git on Khanh&#39;s Blog</description>
+    <image>
+      <title>Khanh&#39;s Blog</title>
+      <url>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
+      <link>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
+    </image>
+    <generator>Hugo -- 0.136.5</generator>
+    <language>en-us</language>
+    <lastBuildDate>Sat, 28 May 2022 14:32:58 +0700</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/git/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Note in Git</title>
+      <link>http://localhost:1313/posts/note-in-git/</link>
+      <pubDate>Sat, 28 May 2022 14:32:58 +0700</pubDate>
+      <guid>http://localhost:1313/posts/note-in-git/</guid>
+      <description>&lt;h2 id=&#34;what-is-a-branch&#34;&gt;What is a branch?&lt;/h2&gt;
+&lt;p&gt;A branch is just a pointer that point to a specific commit. Imagine your repository as a graph of commits, commits are identified by hash strings and be connected together. When you create a new branch, git creates a new pointer and points to the selected commit. Even when you delete a branch, the commit is still there.&lt;/p&gt;
+&lt;h2 id=&#34;what-is-the-head-pointer&#34;&gt;What is the HEAD pointer?&lt;/h2&gt;
+&lt;p&gt;&lt;code&gt;HEAD&lt;/code&gt; point to the current commit you are standing. By default &lt;code&gt;HEAD&lt;/code&gt; point to the newest commit of the current branch. When you checkout to a specific commit, &lt;code&gt;HEAD&lt;/code&gt; will change to point to that commit too.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>
