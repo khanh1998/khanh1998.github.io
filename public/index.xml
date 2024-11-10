@@ -11,8 +11,24 @@
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Sat, 28 May 2022 19:18:41 +0700</lastBuildDate>
+    <lastBuildDate>Sun, 05 Jun 2022 20:01:30 +0700</lastBuildDate>
     <atom:link href="https://khanh1998.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>A note in SSL/TLS</title>
+      <link>https://khanh1998.github.io/posts/note-in-ssl-tls/</link>
+      <pubDate>Sun, 05 Jun 2022 20:01:30 +0700</pubDate>
+      <guid>https://khanh1998.github.io/posts/note-in-ssl-tls/</guid>
+      <description>&lt;h2 id=&#34;what-is-ssl-and-why-do-we-need-them&#34;&gt;What is SSL? and why do we need them?&lt;/h2&gt;
+&lt;p&gt;SSL is a method to encrypt your data before transmitting it to the receiver. If we don’t encrypt and send data as plain text, somebody can sniff in your connection to read all your messages.&lt;/p&gt;
+&lt;h2 id=&#34;how-do-ssl-works&#34;&gt;How do SSL works?&lt;/h2&gt;
+&lt;p&gt;Of course, to establish an SSL, we need a TCP connection first, let’s assume that we have a TCP connection ready.&lt;/p&gt;
+&lt;p&gt;
+  &lt;figure&gt;
+    &lt;img src=&#34;ssl-connection.png&#34; alt=&#34;&#34;&gt;
+    &lt;figcaption&gt;How an SSL connection is established&lt;/figcaption&gt;
+  &lt;/figure&gt;
+&lt;/p&gt;</description>
+    </item>
     <item>
       <title>Is NodeJS really single-threaded?</title>
       <link>https://khanh1998.github.io/posts/is-nodejs-really-single-threaded/</link>
