@@ -11,8 +11,18 @@
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 27 Mar 2022 09:14:22 +0700</lastBuildDate>
+    <lastBuildDate>Sat, 28 May 2022 19:18:41 +0700</lastBuildDate>
     <atom:link href="https://khanh1998.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Is NodeJS really single-threaded?</title>
+      <link>https://khanh1998.github.io/posts/is-nodejs-really-single-threaded/</link>
+      <pubDate>Sat, 28 May 2022 19:18:41 +0700</pubDate>
+      <guid>https://khanh1998.github.io/posts/is-nodejs-really-single-threaded/</guid>
+      <description>&lt;p&gt;No! Not really!&lt;/p&gt;
+&lt;p&gt;NodeJS has one main thread called event-loop and it also has a worker pool to handle blocking IO and CPU-intensive tasks. The default number of threads in the worker pool is 4, and you can change it.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;em&gt;Node.js uses a small number of threads to handle many clients. In Node.js there are two types of threads: one Event Loop (aka the main loop, main thread, event thread, etc.), and a pool of k Workers in a Worker Pool (aka the threadpool).&lt;/em&gt;&lt;/p&gt;</description>
+    </item>
     <item>
       <title>HashCode VS Equals</title>
       <link>https://khanh1998.github.io/posts/hashcode-equals/</link>
