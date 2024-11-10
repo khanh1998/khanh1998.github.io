@@ -11,6 +11,21 @@
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
+    <lastBuildDate>Sun, 02 Jan 2022 20:24:18 +0700</lastBuildDate>
     <atom:link href="https://khanh1998.github.io/tags/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Database</title>
+      <link>https://khanh1998.github.io/tags/database/</link>
+      <pubDate>Sun, 02 Jan 2022 20:24:18 +0700</pubDate>
+      <guid>https://khanh1998.github.io/tags/database/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Networking</title>
+      <link>https://khanh1998.github.io/tags/networking/</link>
+      <pubDate>Tue, 07 Dec 2021 19:57:13 +0700</pubDate>
+      <guid>https://khanh1998.github.io/tags/networking/</guid>
+      <description></description>
+    </item>
   </channel>
 </rss>

@@ -11,7 +11,101 @@
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 01 Jan 0001 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Sun, 09 Jan 2022 09:02:34 +0700</lastBuildDate>
     <atom:link href="https://khanh1998.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>B tree, B&#43; tree, and indexing in database</title>
+      <link>https://khanh1998.github.io/posts/b-tree-and-indexing-in-database/</link>
+      <pubDate>Sun, 09 Jan 2022 09:02:34 +0700</pubDate>
+      <guid>https://khanh1998.github.io/posts/b-tree-and-indexing-in-database/</guid>
+      <description>&lt;h2 id=&#34;b-tree-and-b-tree&#34;&gt;B tree and B+ tree&lt;/h2&gt;
+&lt;p&gt;B tree is a self-balance tree. I can see that the B tree and AVL tree have a thing in common – it is all self-balance. But the difference is, each node in the AVL tree store exactly one value, and have at most two children. Each node of the B tree contains an array of at most &lt;strong&gt;N&lt;/strong&gt; values and has at most &lt;strong&gt;N + 1&lt;/strong&gt; children.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Isolation Level and Read Phenomena</title>
+      <link>https://khanh1998.github.io/posts/isolation-level-and-read-phenomena/</link>
+      <pubDate>Sun, 02 Jan 2022 20:24:18 +0700</pubDate>
+      <guid>https://khanh1998.github.io/posts/isolation-level-and-read-phenomena/</guid>
+      <description>&lt;h2 id=&#34;1-read-phenomena&#34;&gt;1. Read phenomena&lt;/h2&gt;
+&lt;p&gt;When transaction A reads the data that might be changed by transaction B.&lt;/p&gt;
+&lt;h3 id=&#34;11-dirty-reads&#34;&gt;1.1 Dirty reads:&lt;/h3&gt;
+&lt;p&gt;Is when a transaction read uncommitted data from another transaction. Example:&lt;/p&gt;
+&lt;table&gt;
+  &lt;thead&gt;
+      &lt;tr&gt;
+          &lt;th style=&#34;text-align: left&#34;&gt;&lt;strong&gt;Transaction A&lt;/strong&gt;&lt;/th&gt;
+          &lt;th style=&#34;text-align: right&#34;&gt;&lt;strong&gt;Transaction B&lt;/strong&gt;&lt;/th&gt;
+      &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;begin transaction;&lt;/td&gt;
+          &lt;td&gt;&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;select age from employee where id = 1;&lt;/td&gt;
+          &lt;td&gt;&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;// age = 24&lt;/td&gt;
+          &lt;td&gt;&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;&lt;/td&gt;
+          &lt;td style=&#34;text-align: right&#34;&gt;begin transaction;&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;&lt;/td&gt;
+          &lt;td style=&#34;text-align: right&#34;&gt;update employee set age = 25 where id = 1;&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;&lt;/td&gt;
+          &lt;td style=&#34;text-align: right&#34;&gt;// age = 25&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;select age from employee where id = 1;&lt;/td&gt;
+          &lt;td&gt;&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;// age = 25&lt;/td&gt;
+          &lt;td&gt;&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;&lt;/td&gt;
+          &lt;td style=&#34;text-align: right&#34;&gt;rollback;&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;select age from employee where id = 1;&lt;/td&gt;
+          &lt;td&gt;&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;// age = 24&lt;/td&gt;
+          &lt;td&gt;&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+          &lt;td style=&#34;text-align: left&#34;&gt;commit;&lt;/td&gt;
+          &lt;td&gt;&lt;/td&gt;
+      &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;12-non-repeatable-reads&#34;&gt;1.2 Non-repeatable reads&lt;/h3&gt;
+&lt;p&gt;When during a transaction, you retrieve a row two times, and the second time, you got a slightly different row. It is different from the dirty read in that this time, it read committed data.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>ACID</title>
+      <link>https://khanh1998.github.io/posts/acid/</link>
+      <pubDate>Wed, 08 Dec 2021 20:12:19 +0700</pubDate>
+      <guid>https://khanh1998.github.io/posts/acid/</guid>
+      <description>&lt;p&gt;&lt;strong&gt;Atomicity&lt;/strong&gt;: Each transaction could have multiple steps in it, each step might be a query or an update to the data. Atomicity means that the transaction is considered a success if all steps are a success. If just one of those steps is failed, the whole transaction is considered to fail, and it has to roll back to the previous state.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Consistency&lt;/strong&gt;: In the database, it might have some rules or constraints, and the transaction when modified data have to follow those constraints. For example, let say the constrain for bank account balance is 0 or positive, so if a transaction tries to assign a negative number to a bank account, it violates the constrain and has to roll back.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>What happens when you use a browser to access google.com</title>
+      <link>https://khanh1998.github.io/posts/what-happen-when-you-use-a-browser-to-access-google/</link>
+      <pubDate>Tue, 07 Dec 2021 19:57:13 +0700</pubDate>
+      <guid>https://khanh1998.github.io/posts/what-happen-when-you-use-a-browser-to-access-google/</guid>
+      <description>&lt;p&gt;So this is just a quick recap of what I have learned about networking&lt;/p&gt;
+&lt;p&gt;First, you have to connect your computer to the local network. Your computer then will be assigned a local IP by a &lt;strong&gt;DHCP&lt;/strong&gt; server (Dynamic Host Configuration Protocol), you cannot use that local IP to talk to the outside network. All the devices in the same local network will use the IP of the gateway to talk to the internet, sometimes it’s called public IP. The protocol to map from local address to public address is called &lt;strong&gt;NAT&lt;/strong&gt; (Network Address Translation).&lt;/p&gt;</description>
+    </item>
   </channel>
 </rss>
