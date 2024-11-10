@@ -34,7 +34,7 @@ params:
   UseHugoToc: true
   disableSpecial1stPost: false
   disableScrollToTop: false
-  comments: false
+  comments: true
   hidemeta: false
   hideSummary: false
   showtoc: true
@@ -138,6 +138,7 @@ menu:
 # Read: https://github.com/adityatelange/hugo-PaperMod/wiki/FAQs#using-hugos-syntax-highlighter-chroma
 pygmentsUseClasses: true
 markup:
+  defaultMarkdownHandler: goldmark
   highlight:
     noClasses: false
     anchorLineNos: true
@@ -145,3 +146,7 @@ markup:
     guessSyntax: true
     lineNos: true
     style: monokai
+
+services:
+  disqus:
+    shortname: biquckhnh
