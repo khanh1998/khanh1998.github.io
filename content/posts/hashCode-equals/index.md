@@ -2,6 +2,7 @@
 date: '2022-03-27T09:14:22+07:00'
 draft: false
 title: 'HashCode VS Equals'
+tags: ['dsa']
 ---
 To demonstrate what is the difference between object hash code and object equal, I would like to start with a simple example in Python.
 ```python
@@ -92,7 +93,7 @@ So three John objects with the same values in their properties have the same has
 ![image3](image3.png "oops 😬 what wrong?")
 oops 😬 what wrong?\
 After an hour of searching on the internet, I just remember how a hash map works.
-[![image4](image4.png "GeeksForGeeks")](https://www.geeksforgeeks.org/implementing-our-own-hash-table-with-separate-chaining-in-java/)
+![image4](image4.png "GeeksForGeeks")
 I guess, in Python hashmap, they use chaining as a method to handle hashing collision 💥. Hashing collision happens when two different keys have the same hash. In the chaining method, each bucket in the hash map does not contain a pair but a list of pairs. So every pair whose key has the same hash value will be appended to that list.
 
 The problem here is, how do you know if your pair (key, value) has been already on the list or not? Pretty simple, using `__eq__` function to compare objects, we will iterate through every pair in the list and compare it to the new pair, if the new pair haven’t been in the list, we append it to the list. So the next thing we need to do is to override the `__eq__` function.
@@ -114,3 +115,6 @@ class Person:
 ```
 ![image5](image5.png)
 Everything work now hahaha 🤣🤣🤣 hard work payoff.
+
+## References
+https://www.geeksforgeeks.org/implementing-our-own-hash-table-with-separate-chaining-in-java/

@@ -75,8 +75,6 @@ There is no way to **read uncommitted** in Postgres.
 
 **Phantom-read** is prevented even in Repeatable reads Isolation Level.
 ## 4. References
-[en.wikipedia.org/wiki/Isolation_(database_systems)](https://en.wikipedia.org/wiki/Isolation_(database_systems))
-
-[dev.to/techschoolguru/understand-isolation-levels-read-phenomena-in-mysql-postgres-c2e](https://dev.to/techschoolguru/understand-isolation-levels-read-phenomena-in-mysql-postgres-c2e)
-
-[postgresql.org/docs/current/transaction-iso.html](https://www.postgresql.org/docs/current/transaction-iso.html)
+https://en.wikipedia.org/wiki/Isolation_(database_systems)
+https://dev.to/techschoolguru/understand-isolation-levels-read-phenomena-in-mysql-postgres-c2e
+https://www.postgresql.org/docs/current/transaction-iso.html

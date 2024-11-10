@@ -11,8 +11,16 @@
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 02 Jan 2022 20:24:18 +0700</lastBuildDate>
+    <lastBuildDate>Sun, 09 Jan 2022 09:02:34 +0700</lastBuildDate>
     <atom:link href="https://khanh1998.github.io/tags/database/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>B tree, B&#43; tree, and indexing in database</title>
+      <link>https://khanh1998.github.io/posts/b-tree-and-indexing-in-database/</link>
+      <pubDate>Sun, 09 Jan 2022 09:02:34 +0700</pubDate>
+      <guid>https://khanh1998.github.io/posts/b-tree-and-indexing-in-database/</guid>
+      <description>&lt;h2 id=&#34;b-tree-and-b-tree&#34;&gt;B tree and B+ tree&lt;/h2&gt;
+&lt;p&gt;B tree is a self-balance tree. I can see that the B tree and AVL tree have a thing in common – it is all self-balance. But the difference is, each node in the AVL tree store exactly one value, and have at most two children. Each node of the B tree contains an array of at most &lt;strong&gt;N&lt;/strong&gt; values and has at most &lt;strong&gt;N + 1&lt;/strong&gt; children.&lt;/p&gt;</description>
+    </item>
     <item>
       <title>Isolation Level and Read Phenomena</title>
       <link>https://khanh1998.github.io/posts/isolation-level-and-read-phenomena/</link>

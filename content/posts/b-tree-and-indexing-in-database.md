@@ -2,6 +2,7 @@
 date: '2022-01-09T09:02:34+07:00'
 draft: false
 title: 'B tree, B+ tree, and indexing in database'
+tags: ['database']
 ---
 ## B tree and B+ tree
 B tree is a self-balance tree. I can see that the B tree and AVL tree have a thing in common – it is all self-balance. But the difference is, each node in the AVL tree store exactly one value, and have at most two children. Each node of the B tree contains an array of at most **N** values and has at most **N + 1** children.
@@ -52,7 +53,6 @@ In other words, in my example, read a block in B tree has time complexity O(log(
 When you use the B+ tree, even you found the key that you want, you still have to travel to the leaf node to take the value – location of the disk block contains the desired record.
 
 ## References
-[https://stackoverflow.com/a/870324](https://stackoverflow.com/a/870324)
-
-[https://stackoverflow.com/a/1130](https://stackoverflow.com/a/1130)
+https://stackoverflow.com/a/870324
+https://stackoverflow.com/a/1130
 

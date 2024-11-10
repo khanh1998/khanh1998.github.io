@@ -2,6 +2,7 @@
 date: '2022-06-05T20:01:30+07:00'
 draft: false
 title: 'A note in SSL/TLS'
+tag: ['networking']
 ---
 ## What is SSL? and why do we need them?
 SSL is a method to encrypt your data before transmitting it to the receiver. If we don’t encrypt and send data as plain text, somebody can sniff in your connection to read all your messages.
@@ -64,3 +65,6 @@ In SSL, the server will assign and send to each client a random unique value. If
 Each server has a pair of public and private keys, why don’t the client just encrypt data with the public key, and the server can decrypt data using the private key. Vice versa, the server encrypts data with a private key, and the client decrypts using the public key. Those are based on characteristics of an asymmetric key.
 
 Because encrypting data using a symmetric key (the master secret) is faster and needs fewer resources when compared to an asymmetric key.
+
+## References
+https://www.ibm.com/docs/en/cics-tg-multi/9.2?topic=ssl-how-connection-is-established

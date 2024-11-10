@@ -2,6 +2,7 @@
 date: '2022-05-28T19:18:41+07:00'
 draft: false
 title: 'Is NodeJS really single-threaded?'
+tags: ['os']
 ---
 No! Not really!
 
