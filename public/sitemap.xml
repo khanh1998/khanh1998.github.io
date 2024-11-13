@@ -2,16 +2,22 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://khanh1998.github.io/tags/database/</loc>
-    <lastmod>2022-08-21T11:52:42+07:00</lastmod>
-  </url><url>
     <loc>https://khanh1998.github.io/</loc>
-    <lastmod>2022-08-21T11:52:42+07:00</lastmod>
+    <lastmod>2024-11-13T13:58:54+07:00</lastmod>
   </url><url>
     <loc>https://khanh1998.github.io/posts/</loc>
-    <lastmod>2022-08-21T11:52:42+07:00</lastmod>
+    <lastmod>2024-11-13T13:58:54+07:00</lastmod>
+  </url><url>
+    <loc>https://khanh1998.github.io/posts/disjoin-set-union-find/</loc>
+    <lastmod>2022-09-03T14:38:42+07:00</lastmod>
+  </url><url>
+    <loc>https://khanh1998.github.io/tags/dsa/</loc>
+    <lastmod>2022-09-03T14:38:42+07:00</lastmod>
   </url><url>
     <loc>https://khanh1998.github.io/tags/</loc>
+    <lastmod>2022-09-03T14:38:42+07:00</lastmod>
+  </url><url>
+    <loc>https://khanh1998.github.io/tags/database/</loc>
     <lastmod>2022-08-21T11:52:42+07:00</lastmod>
   </url><url>
     <loc>https://khanh1998.github.io/posts/which-operator-is-faster-like-vs-equal/</loc>
@@ -28,9 +34,6 @@
   </url><url>
     <loc>https://khanh1998.github.io/tags/os/</loc>
     <lastmod>2022-05-28T19:18:41+07:00</lastmod>
-  </url><url>
-    <loc>https://khanh1998.github.io/tags/dsa/</loc>
-    <lastmod>2022-03-27T09:14:22+07:00</lastmod>
   </url><url>
     <loc>https://khanh1998.github.io/posts/hashcode-equals/</loc>
     <lastmod>2022-03-27T09:14:22+07:00</lastmod>
