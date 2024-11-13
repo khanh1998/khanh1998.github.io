@@ -2,70 +2,64 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>http://localhost:1313/</loc>
+    <loc>https://khanh1998.github.io/</loc>
     <lastmod>2024-11-13T13:58:54+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/postgres-collation/</loc>
+    <loc>https://khanh1998.github.io/posts/</loc>
     <lastmod>2024-11-13T13:58:54+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/</loc>
-    <lastmod>2024-11-13T13:58:54+07:00</lastmod>
+    <loc>https://khanh1998.github.io/tags/dsa/</loc>
+    <lastmod>2022-09-17T15:07:25+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/disjoin-set-union-find/</loc>
+    <loc>https://khanh1998.github.io/posts/floyd-cycle-detection/</loc>
+    <lastmod>2022-09-17T15:07:25+07:00</lastmod>
+  </url><url>
+    <loc>https://khanh1998.github.io/tags/</loc>
+    <lastmod>2022-09-17T15:07:25+07:00</lastmod>
+  </url><url>
+    <loc>https://khanh1998.github.io/posts/disjoin-set-union-find/</loc>
     <lastmod>2022-09-03T14:38:42+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/tags/dsa/</loc>
-    <lastmod>2022-09-03T14:38:42+07:00</lastmod>
-  </url><url>
-    <loc>http://localhost:1313/tags/</loc>
-    <lastmod>2022-09-03T14:38:42+07:00</lastmod>
-  </url><url>
-    <loc>http://localhost:1313/tags/database/</loc>
+    <loc>https://khanh1998.github.io/tags/database/</loc>
     <lastmod>2022-08-21T11:52:42+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/which-operator-is-faster-like-vs-equal/</loc>
+    <loc>https://khanh1998.github.io/posts/which-operator-is-faster-like-vs-equal/</loc>
     <lastmod>2022-08-21T11:52:42+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/postgres-timezone/</loc>
+    <loc>https://khanh1998.github.io/posts/postgres-timezone/</loc>
     <lastmod>2022-08-20T20:21:06+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/note-in-ssl-tls/</loc>
+    <loc>https://khanh1998.github.io/posts/note-in-ssl-tls/</loc>
     <lastmod>2022-06-05T20:01:30+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/is-nodejs-really-single-threaded/</loc>
+    <loc>https://khanh1998.github.io/posts/is-nodejs-really-single-threaded/</loc>
     <lastmod>2022-05-28T19:18:41+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/tags/os/</loc>
+    <loc>https://khanh1998.github.io/tags/os/</loc>
     <lastmod>2022-05-28T19:18:41+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/tags/git/</loc>
-    <lastmod>2022-05-28T14:32:58+07:00</lastmod>
-  </url><url>
-    <loc>http://localhost:1313/posts/note-in-git/</loc>
-    <lastmod>2022-05-28T14:32:58+07:00</lastmod>
-  </url><url>
-    <loc>http://localhost:1313/posts/hashcode-equals/</loc>
+    <loc>https://khanh1998.github.io/posts/hashcode-equals/</loc>
     <lastmod>2022-03-27T09:14:22+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/b-tree-and-indexing-in-database/</loc>
+    <loc>https://khanh1998.github.io/posts/b-tree-and-indexing-in-database/</loc>
     <lastmod>2022-01-09T09:02:34+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/isolation-level-and-read-phenomena/</loc>
+    <loc>https://khanh1998.github.io/posts/isolation-level-and-read-phenomena/</loc>
     <lastmod>2022-01-02T20:24:18+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/acid/</loc>
+    <loc>https://khanh1998.github.io/posts/acid/</loc>
     <lastmod>2021-12-08T20:12:19+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/tags/networking/</loc>
+    <loc>https://khanh1998.github.io/tags/networking/</loc>
     <lastmod>2021-12-07T19:57:13+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/posts/what-happen-when-you-use-a-browser-to-access-google/</loc>
+    <loc>https://khanh1998.github.io/posts/what-happen-when-you-use-a-browser-to-access-google/</loc>
     <lastmod>2021-12-07T19:57:13+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/archives/</loc>
+    <loc>https://khanh1998.github.io/archives/</loc>
   </url><url>
-    <loc>http://localhost:1313/categories/</loc>
+    <loc>https://khanh1998.github.io/categories/</loc>
   </url><url>
-    <loc>http://localhost:1313/search/</loc>
+    <loc>https://khanh1998.github.io/search/</loc>
   </url>
 </urlset>
