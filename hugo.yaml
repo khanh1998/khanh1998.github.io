@@ -1,6 +1,6 @@
 baseURL: https://khanh1998.github.io/
 languageCode: en-us
-title: Khanh's Blog
+title: Khanh1998
 theme: ["PaperMod"]
 
 enableRobotsTXT: true
@@ -14,10 +14,10 @@ minify:
 
 params:
   env: production # to enable google analytics, opengraph, twitter-cards and schema.
-  title: ExampleSite
-  description: "ExampleSite description"
-  keywords: [Blog, Portfolio, PaperMod]
-  author: Me
+  title: Khanh1998
+  description: "Khanh1998's Blog"
+  keywords: ["khanh1998", "Khanh's Blog", "database", "distributed system", "networking", "operating system", "dsa"]
+  author: Khanh Bui
   # author: ["Me", "You"] # multiple authors
   images: ["<link or path of image for opengraph, twitter-cards>"]
   DateFormat: "January 2, 2006"
@@ -52,7 +52,7 @@ params:
     safari_pinned_tab: "<link / abs url>"
 
   label:
-    text: "Khanh's Blog"
+    text: "Khanh1998"
     icon: /apple-touch-icon.png
     iconHeight: 35
 
@@ -88,7 +88,7 @@ params:
 
   analytics:
     google:
-      SiteVerificationTag: "XYZabc"
+      SiteVerificationTag: "Siuz-KNzTaGnjWViVxoA0J6xLTJQtxwpsh9L7HHMNnA"
     bing:
       SiteVerificationTag: "XYZabc"
     yandex:
@@ -151,3 +151,6 @@ markup:
 services:
   disqus:
     shortname: khanh1998
+    services:
+  googleAnalytics:
+    id: G-Y0MCHJNHTB
