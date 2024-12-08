@@ -11,8 +11,16 @@
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 08 Dec 2024 13:33:55 +0700</lastBuildDate>
+    <lastBuildDate>Sun, 08 Dec 2024 13:57:02 +0700</lastBuildDate>
     <atom:link href="http://localhost:1313/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Why would sometimes 0.1 &#43; 0.2 equals to 0.3, but sometimes it’s not in Go</title>
+      <link>http://localhost:1313/posts/go-untyped-constant/</link>
+      <pubDate>Sun, 08 Dec 2024 13:57:02 +0700</pubDate>
+      <guid>http://localhost:1313/posts/go-untyped-constant/</guid>
+      <description>&lt;p&gt;You may have heard about &lt;em&gt;0.1 + 0.2 != 0.3&lt;/em&gt; already, it’s a common issue in most programming languages. The reason behind that is the floating point (IEEE 754) as the computer can’t represent exactly a decimal in binary. By utilizing the floating point, the computer can hold a very large decimal, but the trade-off is it now can only represent the approximate of the true value.&lt;/p&gt;
+&lt;p&gt;However, in this post, I will not explain how floating point works but something else – &lt;a href=&#34;https://go.dev/blog/constants&#34;&gt;constant&lt;/a&gt;.&lt;/p&gt;</description>
+    </item>
     <item>
       <title>A Note About Rust Smart Pointer and Deref</title>
       <link>http://localhost:1313/posts/a-note-about-rust-smart-pointer-and-deref/</link>
@@ -37,13 +45,6 @@
 &lt;h2 id=&#34;the-smart-pointers&#34;&gt;the smart pointers&lt;/h2&gt;
 &lt;h3 id=&#34;boxt&#34;&gt;&lt;code&gt;Box&amp;lt;T&amp;gt;&lt;/code&gt;&lt;/h3&gt;
 &lt;p&gt;here is an example of how you can init and modify the value of a Box&lt;!-- raw HTML omitted --&gt;:&lt;/p&gt;</description>
-    </item>
-    <item>
-      <title>Postgres Collation</title>
-      <link>http://localhost:1313/posts/postgres-collation/</link>
-      <pubDate>Wed, 13 Nov 2024 13:58:54 +0700</pubDate>
-      <guid>http://localhost:1313/posts/postgres-collation/</guid>
-      <description></description>
     </item>
     <item>
       <title>Floyd’s cycle detection</title>
@@ -193,16 +194,6 @@ the word &lt;em&gt;disjoin&lt;/em&gt; means &lt;em&gt;non-overlapping&lt;/em&gt;
 &lt;p&gt;NodeJS has one main thread called event-loop and it also has a worker pool to handle blocking IO and CPU-intensive tasks. The default number of threads in the worker pool is 4, and you can change it.&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;em&gt;Node.js uses a small number of threads to handle many clients. In Node.js there are two types of threads: one Event Loop (aka the main loop, main thread, event thread, etc.), and a pool of k Workers in a Worker Pool (aka the threadpool).&lt;/em&gt;&lt;/p&gt;</description>
-    </item>
-    <item>
-      <title>Note in Git</title>
-      <link>http://localhost:1313/posts/note-in-git/</link>
-      <pubDate>Sat, 28 May 2022 14:32:58 +0700</pubDate>
-      <guid>http://localhost:1313/posts/note-in-git/</guid>
-      <description>&lt;h2 id=&#34;what-is-a-branch&#34;&gt;What is a branch?&lt;/h2&gt;
-&lt;p&gt;A branch is just a pointer that point to a specific commit. Imagine your repository as a graph of commits, commits are identified by hash strings and be connected together. When you create a new branch, git creates a new pointer and points to the selected commit. Even when you delete a branch, the commit is still there.&lt;/p&gt;
-&lt;h2 id=&#34;what-is-the-head-pointer&#34;&gt;What is the HEAD pointer?&lt;/h2&gt;
-&lt;p&gt;&lt;code&gt;HEAD&lt;/code&gt; point to the current commit you are standing. By default &lt;code&gt;HEAD&lt;/code&gt; point to the newest commit of the current branch. When you checkout to a specific commit, &lt;code&gt;HEAD&lt;/code&gt; will change to point to that commit too.&lt;/p&gt;</description>
     </item>
     <item>
       <title>HashCode VS Equals</title>
