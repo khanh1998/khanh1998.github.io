@@ -2,7 +2,7 @@
 date: '2024-12-08T13:57:02+07:00'
 draft: false
 title: 'Why would sometimes 0.1 + 0.2 equals to 0.3, but sometimes it’s not in Go'
-tags: ['cs']
+tags: ['go','cs']
 ---
 You may have heard about *0.1 + 0.2 != 0.3* already, it’s a common issue in most programming languages. The reason behind that is the floating point (IEEE 754) as the computer can’t represent exactly a decimal in binary. By utilizing the floating point, the computer can hold a very large decimal, but the trade-off is it now can only represent the approximate of the true value.
 
