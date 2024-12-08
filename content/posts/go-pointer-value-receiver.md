@@ -1,5 +1,5 @@
 ---
-date: '2024-12-08T14:24:03+07:00'
+date: '2024-05-21T14:24:03+07:00'
 draft: false
 title: 'The pointer receiver and value receiver in Go are just syntax sugar'
 tags: ['go']

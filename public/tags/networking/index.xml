@@ -11,8 +11,15 @@
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Tue, 07 Dec 2021 19:57:13 +0700</lastBuildDate>
+    <lastBuildDate>Thu, 01 Aug 2024 14:48:29 +0700</lastBuildDate>
     <atom:link href="http://localhost:1313/tags/networking/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>What does it mean to listen on localhost:8080?</title>
+      <link>http://localhost:1313/posts/listen-on-localhost-8080-meaning/</link>
+      <pubDate>Thu, 01 Aug 2024 14:48:29 +0700</pubDate>
+      <guid>http://localhost:1313/posts/listen-on-localhost-8080-meaning/</guid>
+      <description></description>
+    </item>
     <item>
       <title>What happens when you use a browser to access google.com</title>
       <link>http://localhost:1313/posts/what-happen-when-you-use-a-browser-to-access-google/</link>

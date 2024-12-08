@@ -1,5 +1,5 @@
 ---
-date: '2024-12-08T13:57:02+07:00'
+date: '2023-09-10T13:57:02+07:00'
 draft: false
 title: 'Why would sometimes 0.1 + 0.2 equals to 0.3, but sometimes it’s not in Go'
 tags: ['go','cs']

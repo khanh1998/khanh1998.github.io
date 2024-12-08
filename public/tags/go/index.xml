@@ -11,12 +11,12 @@
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 08 Dec 2024 14:24:03 +0700</lastBuildDate>
+    <lastBuildDate>Tue, 21 May 2024 14:24:03 +0700</lastBuildDate>
     <atom:link href="http://localhost:1313/tags/go/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>The pointer receiver and value receiver in Go are just syntax sugar</title>
       <link>http://localhost:1313/posts/go-pointer-value-receiver/</link>
-      <pubDate>Sun, 08 Dec 2024 14:24:03 +0700</pubDate>
+      <pubDate>Tue, 21 May 2024 14:24:03 +0700</pubDate>
       <guid>http://localhost:1313/posts/go-pointer-value-receiver/</guid>
       <description>&lt;p&gt;If you are a Gopher, you probably heard some advice that goes like this: when you edit a value then use a pointer receiver, when you read use a value receiver. That’s not always correct and you should be careful when using them.&lt;/p&gt;
 &lt;h2 id=&#34;issue&#34;&gt;Issue&lt;/h2&gt;
@@ -110,7 +110,7 @@
     <item>
       <title>Why would sometimes 0.1 &#43; 0.2 equals to 0.3, but sometimes it’s not in Go</title>
       <link>http://localhost:1313/posts/go-untyped-constant/</link>
-      <pubDate>Sun, 08 Dec 2024 13:57:02 +0700</pubDate>
+      <pubDate>Sun, 10 Sep 2023 13:57:02 +0700</pubDate>
       <guid>http://localhost:1313/posts/go-untyped-constant/</guid>
       <description>&lt;p&gt;You may have heard about &lt;em&gt;0.1 + 0.2 != 0.3&lt;/em&gt; already, it’s a common issue in most programming languages. The reason behind that is the floating point (IEEE 754) as the computer can’t represent exactly a decimal in binary. By utilizing the floating point, the computer can hold a very large decimal, but the trade-off is it now can only represent the approximate of the true value.&lt;/p&gt;
 &lt;p&gt;However, in this post, I will not explain how floating point works but something else – &lt;a href=&#34;https://go.dev/blog/constants&#34;&gt;constant&lt;/a&gt;.&lt;/p&gt;</description>

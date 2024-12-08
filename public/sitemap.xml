@@ -2,32 +2,38 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>http://localhost:1313/tags/go/</loc>
-    <lastmod>2024-12-08T14:24:03+07:00</lastmod>
-  </url><url>
     <loc>http://localhost:1313/</loc>
-    <lastmod>2024-12-08T14:24:03+07:00</lastmod>
+    <lastmod>2024-11-13T13:58:54+07:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/posts/</loc>
-    <lastmod>2024-12-08T14:24:03+07:00</lastmod>
+    <lastmod>2024-11-13T13:58:54+07:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/tags/networking/</loc>
+    <lastmod>2024-08-01T14:48:29+07:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/tags/</loc>
-    <lastmod>2024-12-08T14:24:03+07:00</lastmod>
+    <lastmod>2024-08-01T14:48:29+07:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/posts/listen-on-localhost-8080-meaning/</loc>
+    <lastmod>2024-08-01T14:48:29+07:00</lastmod>
+  </url><url>
+    <loc>http://localhost:1313/tags/go/</loc>
+    <lastmod>2024-05-21T14:24:03+07:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/posts/go-pointer-value-receiver/</loc>
-    <lastmod>2024-12-08T14:24:03+07:00</lastmod>
+    <lastmod>2024-05-21T14:24:03+07:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/tags/cs/</loc>
-    <lastmod>2024-12-08T13:57:02+07:00</lastmod>
+    <lastmod>2023-09-10T13:57:02+07:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/posts/go-untyped-constant/</loc>
-    <lastmod>2024-12-08T13:57:02+07:00</lastmod>
+    <lastmod>2023-09-10T13:57:02+07:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/posts/a-note-about-rust-smart-pointer-and-deref/</loc>
-    <lastmod>2024-12-08T13:33:55+07:00</lastmod>
+    <lastmod>2022-12-11T13:33:55+07:00</lastmod>
   </url><url>
-    <loc>http://localhost:1313/tags/rus/</loc>
-    <lastmod>2024-12-08T13:33:55+07:00</lastmod>
+    <loc>http://localhost:1313/tags/rust/</loc>
+    <lastmod>2022-12-11T13:33:55+07:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/tags/dsa/</loc>
     <lastmod>2022-09-17T15:07:25+07:00</lastmod>
@@ -70,9 +76,6 @@
   </url><url>
     <loc>http://localhost:1313/posts/acid/</loc>
     <lastmod>2021-12-08T20:12:19+07:00</lastmod>
-  </url><url>
-    <loc>http://localhost:1313/tags/networking/</loc>
-    <lastmod>2021-12-07T19:57:13+07:00</lastmod>
   </url><url>
     <loc>http://localhost:1313/posts/what-happen-when-you-use-a-browser-to-access-google/</loc>
     <lastmod>2021-12-07T19:57:13+07:00</lastmod>

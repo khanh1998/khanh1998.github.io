@@ -1,8 +1,8 @@
 ---
-date: '2024-12-08T13:33:55+07:00'
+date: '2022-12-11T13:33:55+07:00'
 draft: false
 title: 'A Note About Rust Smart Pointer and Deref'
-tags: ['rus','cs']
+tags: ['rust','cs']
 ---
 this article assumes you have some basic knowledge about [Rust smart pointers](https://doc.rust-lang.org/book/ch15-00-smart-pointers.html).
 ## the dereference (*) operator
