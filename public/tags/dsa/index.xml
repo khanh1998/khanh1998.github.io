@@ -2,22 +2,22 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Dsa on Khanh1998</title>
-    <link>https://khanh1998.github.io/tags/dsa/</link>
+    <link>http://localhost:1313/tags/dsa/</link>
     <description>Recent content in Dsa on Khanh1998</description>
     <image>
       <title>Khanh1998</title>
-      <url>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
-      <link>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
+      <url>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
+      <link>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
     <lastBuildDate>Sat, 17 Sep 2022 15:07:25 +0700</lastBuildDate>
-    <atom:link href="https://khanh1998.github.io/tags/dsa/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://localhost:1313/tags/dsa/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Floyd’s cycle detection</title>
-      <link>https://khanh1998.github.io/posts/floyd-cycle-detection/</link>
+      <link>http://localhost:1313/posts/floyd-cycle-detection/</link>
       <pubDate>Sat, 17 Sep 2022 15:07:25 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/floyd-cycle-detection/</guid>
+      <guid>http://localhost:1313/posts/floyd-cycle-detection/</guid>
       <description>&lt;p&gt;
   &lt;figure&gt;
     &lt;img src=&#34;linked-list.png&#34; alt=&#34;&#34;&gt;
@@ -36,9 +36,9 @@ The total distance that the &lt;code&gt;fast pointer&lt;/code&gt; has moved is $
     </item>
     <item>
       <title>Disjoin-Set/Union-Find notes</title>
-      <link>https://khanh1998.github.io/posts/disjoin-set-union-find/</link>
+      <link>http://localhost:1313/posts/disjoin-set-union-find/</link>
       <pubDate>Sat, 03 Sep 2022 14:38:42 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/disjoin-set-union-find/</guid>
+      <guid>http://localhost:1313/posts/disjoin-set-union-find/</guid>
       <description>&lt;h2 id=&#34;1-definition&#34;&gt;1. Definition&lt;/h2&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;em&gt;set&lt;/em&gt; is a collection of unique elements.
@@ -64,9 +64,9 @@ the word &lt;em&gt;disjoin&lt;/em&gt; means &lt;em&gt;non-overlapping&lt;/em&gt;
     </item>
     <item>
       <title>HashCode VS Equals</title>
-      <link>https://khanh1998.github.io/posts/hashcode-equals/</link>
+      <link>http://localhost:1313/posts/hashcode-equals/</link>
       <pubDate>Sun, 27 Mar 2022 09:14:22 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/hashcode-equals/</guid>
+      <guid>http://localhost:1313/posts/hashcode-equals/</guid>
       <description>&lt;p&gt;To demonstrate what is the difference between object hash code and object equal, I would like to start with a simple example in Python.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;

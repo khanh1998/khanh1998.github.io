@@ -2,22 +2,54 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Khanh1998</title>
-    <link>https://khanh1998.github.io/</link>
+    <link>http://localhost:1313/</link>
     <description>Recent content on Khanh1998</description>
     <image>
       <title>Khanh1998</title>
-      <url>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
-      <link>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
+      <url>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
+      <link>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Sat, 17 Sep 2022 15:07:25 +0700</lastBuildDate>
-    <atom:link href="https://khanh1998.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Sun, 08 Dec 2024 13:33:55 +0700</lastBuildDate>
+    <atom:link href="http://localhost:1313/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>A Note About Rust Smart Pointer and Deref</title>
+      <link>http://localhost:1313/posts/a-note-about-rust-smart-pointer-and-deref/</link>
+      <pubDate>Sun, 08 Dec 2024 13:33:55 +0700</pubDate>
+      <guid>http://localhost:1313/posts/a-note-about-rust-smart-pointer-and-deref/</guid>
+      <description>&lt;p&gt;this article assumes you have some basic knowledge about &lt;a href=&#34;https://doc.rust-lang.org/book/ch15-00-smart-pointers.html&#34;&gt;Rust smart pointers&lt;/a&gt;.&lt;/p&gt;
+&lt;h2 id=&#34;the-dereference--operator&#34;&gt;the dereference (*) operator&lt;/h2&gt;
+&lt;p&gt;&lt;em&gt;dereference&lt;/em&gt; operator &lt;code&gt;*&lt;/code&gt; is used for getting the actual value from a reference:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34; id=&#34;hl-0-1&#34;&gt;&lt;a class=&#34;lnlinks&#34; href=&#34;#hl-0-1&#34;&gt;1&lt;/a&gt;
+&lt;/span&gt;&lt;span class=&#34;lnt&#34; id=&#34;hl-0-2&#34;&gt;&lt;a class=&#34;lnlinks&#34; href=&#34;#hl-0-2&#34;&gt;2&lt;/a&gt;
+&lt;/span&gt;&lt;span class=&#34;lnt&#34; id=&#34;hl-0-3&#34;&gt;&lt;a class=&#34;lnlinks&#34; href=&#34;#hl-0-3&#34;&gt;3&lt;/a&gt;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;kd&#34;&gt;let&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;a&lt;/span&gt;: &lt;span class=&#34;kt&#34;&gt;i32&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;mi&#34;&gt;5&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;    
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;kd&#34;&gt;let&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;b&lt;/span&gt;: &lt;span class=&#34;kp&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;kt&#34;&gt;i32&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;a&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;fm&#34;&gt;assert_eq!&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;b&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;mi&#34;&gt;5&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;);&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;in the above example, &lt;code&gt;b&lt;/code&gt; is a reference to &lt;code&gt;a&lt;/code&gt;, &lt;code&gt;*b&lt;/code&gt; will return the value that &lt;code&gt;b&lt;/code&gt; pointing to.&lt;/p&gt;
+&lt;h2 id=&#34;the-smart-pointers&#34;&gt;the smart pointers&lt;/h2&gt;
+&lt;h3 id=&#34;boxt&#34;&gt;&lt;code&gt;Box&amp;lt;T&amp;gt;&lt;/code&gt;&lt;/h3&gt;
+&lt;p&gt;here is an example of how you can init and modify the value of a Box&lt;!-- raw HTML omitted --&gt;:&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Postgres Collation</title>
+      <link>http://localhost:1313/posts/postgres-collation/</link>
+      <pubDate>Wed, 13 Nov 2024 13:58:54 +0700</pubDate>
+      <guid>http://localhost:1313/posts/postgres-collation/</guid>
+      <description></description>
+    </item>
     <item>
       <title>Floyd’s cycle detection</title>
-      <link>https://khanh1998.github.io/posts/floyd-cycle-detection/</link>
+      <link>http://localhost:1313/posts/floyd-cycle-detection/</link>
       <pubDate>Sat, 17 Sep 2022 15:07:25 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/floyd-cycle-detection/</guid>
+      <guid>http://localhost:1313/posts/floyd-cycle-detection/</guid>
       <description>&lt;p&gt;
   &lt;figure&gt;
     &lt;img src=&#34;linked-list.png&#34; alt=&#34;&#34;&gt;
@@ -36,9 +68,9 @@ The total distance that the &lt;code&gt;fast pointer&lt;/code&gt; has moved is $
     </item>
     <item>
       <title>Disjoin-Set/Union-Find notes</title>
-      <link>https://khanh1998.github.io/posts/disjoin-set-union-find/</link>
+      <link>http://localhost:1313/posts/disjoin-set-union-find/</link>
       <pubDate>Sat, 03 Sep 2022 14:38:42 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/disjoin-set-union-find/</guid>
+      <guid>http://localhost:1313/posts/disjoin-set-union-find/</guid>
       <description>&lt;h2 id=&#34;1-definition&#34;&gt;1. Definition&lt;/h2&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;em&gt;set&lt;/em&gt; is a collection of unique elements.
@@ -64,9 +96,9 @@ the word &lt;em&gt;disjoin&lt;/em&gt; means &lt;em&gt;non-overlapping&lt;/em&gt;
     </item>
     <item>
       <title>Which operator is faster: like vs =</title>
-      <link>https://khanh1998.github.io/posts/which-operator-is-faster-like-vs-equal/</link>
+      <link>http://localhost:1313/posts/which-operator-is-faster-like-vs-equal/</link>
       <pubDate>Sun, 21 Aug 2022 11:52:42 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/which-operator-is-faster-like-vs-equal/</guid>
+      <guid>http://localhost:1313/posts/which-operator-is-faster-like-vs-equal/</guid>
       <description>&lt;h2 id=&#34;explain&#34;&gt;Explain&lt;/h2&gt;
 &lt;p&gt;Explaining the query will help you to estimate how expensive your query is and which query plan will be used.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -91,9 +123,9 @@ the word &lt;em&gt;disjoin&lt;/em&gt; means &lt;em&gt;non-overlapping&lt;/em&gt;
     </item>
     <item>
       <title>Postgres Timezone</title>
-      <link>https://khanh1998.github.io/posts/postgres-timezone/</link>
+      <link>http://localhost:1313/posts/postgres-timezone/</link>
       <pubDate>Sat, 20 Aug 2022 20:21:06 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/postgres-timezone/</guid>
+      <guid>http://localhost:1313/posts/postgres-timezone/</guid>
       <description>&lt;h2 id=&#34;check-timezone-of-the-current-session&#34;&gt;Check timezone of the current session&lt;/h2&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -138,9 +170,9 @@ the word &lt;em&gt;disjoin&lt;/em&gt; means &lt;em&gt;non-overlapping&lt;/em&gt;
     </item>
     <item>
       <title>A note in SSL/TLS</title>
-      <link>https://khanh1998.github.io/posts/note-in-ssl-tls/</link>
+      <link>http://localhost:1313/posts/note-in-ssl-tls/</link>
       <pubDate>Sun, 05 Jun 2022 20:01:30 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/note-in-ssl-tls/</guid>
+      <guid>http://localhost:1313/posts/note-in-ssl-tls/</guid>
       <description>&lt;h2 id=&#34;what-is-ssl-and-why-do-we-need-them&#34;&gt;What is SSL? and why do we need them?&lt;/h2&gt;
 &lt;p&gt;SSL is a method to encrypt your data before transmitting it to the receiver. If we don’t encrypt and send data as plain text, somebody can sniff in your connection to read all your messages.&lt;/p&gt;
 &lt;h2 id=&#34;how-do-ssl-works&#34;&gt;How do SSL works?&lt;/h2&gt;
@@ -154,19 +186,29 @@ the word &lt;em&gt;disjoin&lt;/em&gt; means &lt;em&gt;non-overlapping&lt;/em&gt;
     </item>
     <item>
       <title>Is NodeJS really single-threaded?</title>
-      <link>https://khanh1998.github.io/posts/is-nodejs-really-single-threaded/</link>
+      <link>http://localhost:1313/posts/is-nodejs-really-single-threaded/</link>
       <pubDate>Sat, 28 May 2022 19:18:41 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/is-nodejs-really-single-threaded/</guid>
+      <guid>http://localhost:1313/posts/is-nodejs-really-single-threaded/</guid>
       <description>&lt;p&gt;No! Not really!&lt;/p&gt;
 &lt;p&gt;NodeJS has one main thread called event-loop and it also has a worker pool to handle blocking IO and CPU-intensive tasks. The default number of threads in the worker pool is 4, and you can change it.&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;em&gt;Node.js uses a small number of threads to handle many clients. In Node.js there are two types of threads: one Event Loop (aka the main loop, main thread, event thread, etc.), and a pool of k Workers in a Worker Pool (aka the threadpool).&lt;/em&gt;&lt;/p&gt;</description>
     </item>
     <item>
+      <title>Note in Git</title>
+      <link>http://localhost:1313/posts/note-in-git/</link>
+      <pubDate>Sat, 28 May 2022 14:32:58 +0700</pubDate>
+      <guid>http://localhost:1313/posts/note-in-git/</guid>
+      <description>&lt;h2 id=&#34;what-is-a-branch&#34;&gt;What is a branch?&lt;/h2&gt;
+&lt;p&gt;A branch is just a pointer that point to a specific commit. Imagine your repository as a graph of commits, commits are identified by hash strings and be connected together. When you create a new branch, git creates a new pointer and points to the selected commit. Even when you delete a branch, the commit is still there.&lt;/p&gt;
+&lt;h2 id=&#34;what-is-the-head-pointer&#34;&gt;What is the HEAD pointer?&lt;/h2&gt;
+&lt;p&gt;&lt;code&gt;HEAD&lt;/code&gt; point to the current commit you are standing. By default &lt;code&gt;HEAD&lt;/code&gt; point to the newest commit of the current branch. When you checkout to a specific commit, &lt;code&gt;HEAD&lt;/code&gt; will change to point to that commit too.&lt;/p&gt;</description>
+    </item>
+    <item>
       <title>HashCode VS Equals</title>
-      <link>https://khanh1998.github.io/posts/hashcode-equals/</link>
+      <link>http://localhost:1313/posts/hashcode-equals/</link>
       <pubDate>Sun, 27 Mar 2022 09:14:22 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/hashcode-equals/</guid>
+      <guid>http://localhost:1313/posts/hashcode-equals/</guid>
       <description>&lt;p&gt;To demonstrate what is the difference between object hash code and object equal, I would like to start with a simple example in Python.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -238,17 +280,17 @@ the word &lt;em&gt;disjoin&lt;/em&gt; means &lt;em&gt;non-overlapping&lt;/em&gt;
     </item>
     <item>
       <title>B tree, B&#43; tree, and indexing in database</title>
-      <link>https://khanh1998.github.io/posts/b-tree-and-indexing-in-database/</link>
+      <link>http://localhost:1313/posts/b-tree-and-indexing-in-database/</link>
       <pubDate>Sun, 09 Jan 2022 09:02:34 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/b-tree-and-indexing-in-database/</guid>
+      <guid>http://localhost:1313/posts/b-tree-and-indexing-in-database/</guid>
       <description>&lt;h2 id=&#34;b-tree-and-b-tree&#34;&gt;B tree and B+ tree&lt;/h2&gt;
 &lt;p&gt;B tree is a self-balance tree. I can see that the B tree and AVL tree have a thing in common – it is all self-balance. But the difference is, each node in the AVL tree store exactly one value, and have at most two children. Each node of the B tree contains an array of at most &lt;strong&gt;N&lt;/strong&gt; values and has at most &lt;strong&gt;N + 1&lt;/strong&gt; children.&lt;/p&gt;</description>
     </item>
     <item>
       <title>Isolation Level and Read Phenomena</title>
-      <link>https://khanh1998.github.io/posts/isolation-level-and-read-phenomena/</link>
+      <link>http://localhost:1313/posts/isolation-level-and-read-phenomena/</link>
       <pubDate>Sun, 02 Jan 2022 20:24:18 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/isolation-level-and-read-phenomena/</guid>
+      <guid>http://localhost:1313/posts/isolation-level-and-read-phenomena/</guid>
       <description>&lt;h2 id=&#34;1-read-phenomena&#34;&gt;1. Read phenomena&lt;/h2&gt;
 &lt;p&gt;When transaction A reads the data that might be changed by transaction B.&lt;/p&gt;
 &lt;h3 id=&#34;11-dirty-reads&#34;&gt;1.1 Dirty reads:&lt;/h3&gt;
@@ -316,17 +358,17 @@ the word &lt;em&gt;disjoin&lt;/em&gt; means &lt;em&gt;non-overlapping&lt;/em&gt;
     </item>
     <item>
       <title>ACID</title>
-      <link>https://khanh1998.github.io/posts/acid/</link>
+      <link>http://localhost:1313/posts/acid/</link>
       <pubDate>Wed, 08 Dec 2021 20:12:19 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/acid/</guid>
+      <guid>http://localhost:1313/posts/acid/</guid>
       <description>&lt;p&gt;&lt;strong&gt;Atomicity&lt;/strong&gt;: Each transaction could have multiple steps in it, each step might be a query or an update to the data. Atomicity means that the transaction is considered a success if all steps are a success. If just one of those steps is failed, the whole transaction is considered to fail, and it has to roll back to the previous state.&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;Consistency&lt;/strong&gt;: In the database, it might have some rules or constraints, and the transaction when modified data have to follow those constraints. For example, let say the constrain for bank account balance is 0 or positive, so if a transaction tries to assign a negative number to a bank account, it violates the constrain and has to roll back.&lt;/p&gt;</description>
     </item>
     <item>
       <title>What happens when you use a browser to access google.com</title>
-      <link>https://khanh1998.github.io/posts/what-happen-when-you-use-a-browser-to-access-google/</link>
+      <link>http://localhost:1313/posts/what-happen-when-you-use-a-browser-to-access-google/</link>
       <pubDate>Tue, 07 Dec 2021 19:57:13 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/what-happen-when-you-use-a-browser-to-access-google/</guid>
+      <guid>http://localhost:1313/posts/what-happen-when-you-use-a-browser-to-access-google/</guid>
       <description>&lt;p&gt;So this is just a quick recap of what I have learned about networking&lt;/p&gt;
 &lt;p&gt;First, you have to connect your computer to the local network. Your computer then will be assigned a local IP by a &lt;strong&gt;DHCP&lt;/strong&gt; server (Dynamic Host Configuration Protocol), you cannot use that local IP to talk to the outside network. All the devices in the same local network will use the IP of the gateway to talk to the internet, sometimes it’s called public IP. The protocol to map from local address to public address is called &lt;strong&gt;NAT&lt;/strong&gt; (Network Address Translation).&lt;/p&gt;</description>
     </item>
