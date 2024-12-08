@@ -23,7 +23,7 @@ params:
   DateFormat: "January 2, 2006"
   defaultTheme: auto # dark, light
   disableThemeToggle: false
-  math: false
+  math: false # globally disable, can turn it on for each post
 
   ShowReadingTime: true
   ShowShareButtons: true
@@ -53,8 +53,8 @@ params:
 
   label:
     text: "Khanh1998"
-    icon: /apple-touch-icon.png
-    iconHeight: 35
+    icon: /favicon.ico
+    iconHeight: 32
 
   # profile-mode
   profileMode:
@@ -74,7 +74,7 @@ params:
   # home-info mode
   homeInfoParams:
     Title: "Hi there \U0001F44B"
-    Content: Based in Vietnam, I’m a backend-focused software engineer with expertise in Go and Postgres. Passionate about databases and distributed systems, I started this blog to document my learning journey and share insights. I hope my experiences can support others navigating similar paths in tech.
+    Content: I’m a backend-focused software engineer based in Vietnam, with expertise in Go and Postgres. I have a passion for understanding things at a fundamental level, particularly OS, databases and distributed systems.
 
   socialIcons:
     - name: x
