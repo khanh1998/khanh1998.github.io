@@ -2,71 +2,92 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Tags on Khanh1998</title>
-    <link>https://khanh1998.github.io/tags/</link>
+    <link>http://localhost:1313/tags/</link>
     <description>Recent content in Tags on Khanh1998</description>
     <image>
       <title>Khanh1998</title>
-      <url>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
-      <link>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
+      <url>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
+      <link>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Thu, 01 Aug 2024 14:48:29 +0700</lastBuildDate>
-    <atom:link href="https://khanh1998.github.io/tags/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Wed, 13 Nov 2024 13:58:54 +0700</lastBuildDate>
+    <atom:link href="http://localhost:1313/tags/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Db</title>
+      <link>http://localhost:1313/tags/db/</link>
+      <pubDate>Wed, 13 Nov 2024 13:58:54 +0700</pubDate>
+      <guid>http://localhost:1313/tags/db/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Postgres</title>
+      <link>http://localhost:1313/tags/postgres/</link>
+      <pubDate>Wed, 13 Nov 2024 13:58:54 +0700</pubDate>
+      <guid>http://localhost:1313/tags/postgres/</guid>
+      <description></description>
+    </item>
     <item>
       <title>Networking</title>
-      <link>https://khanh1998.github.io/tags/networking/</link>
+      <link>http://localhost:1313/tags/networking/</link>
       <pubDate>Thu, 01 Aug 2024 14:48:29 +0700</pubDate>
-      <guid>https://khanh1998.github.io/tags/networking/</guid>
+      <guid>http://localhost:1313/tags/networking/</guid>
       <description></description>
     </item>
     <item>
       <title>Go</title>
-      <link>https://khanh1998.github.io/tags/go/</link>
+      <link>http://localhost:1313/tags/go/</link>
       <pubDate>Tue, 21 May 2024 14:24:03 +0700</pubDate>
-      <guid>https://khanh1998.github.io/tags/go/</guid>
+      <guid>http://localhost:1313/tags/go/</guid>
       <description></description>
     </item>
     <item>
       <title>Cs</title>
-      <link>https://khanh1998.github.io/tags/cs/</link>
+      <link>http://localhost:1313/tags/cs/</link>
       <pubDate>Sun, 10 Sep 2023 13:57:02 +0700</pubDate>
-      <guid>https://khanh1998.github.io/tags/cs/</guid>
+      <guid>http://localhost:1313/tags/cs/</guid>
       <description></description>
     </item>
     <item>
       <title>Rust</title>
-      <link>https://khanh1998.github.io/tags/rust/</link>
+      <link>http://localhost:1313/tags/rust/</link>
       <pubDate>Sun, 11 Dec 2022 13:33:55 +0700</pubDate>
-      <guid>https://khanh1998.github.io/tags/rust/</guid>
+      <guid>http://localhost:1313/tags/rust/</guid>
       <description></description>
     </item>
     <item>
       <title>Dsa</title>
-      <link>https://khanh1998.github.io/tags/dsa/</link>
+      <link>http://localhost:1313/tags/dsa/</link>
       <pubDate>Sat, 17 Sep 2022 15:07:25 +0700</pubDate>
-      <guid>https://khanh1998.github.io/tags/dsa/</guid>
+      <guid>http://localhost:1313/tags/dsa/</guid>
       <description></description>
     </item>
     <item>
       <title>Database</title>
-      <link>https://khanh1998.github.io/tags/database/</link>
+      <link>http://localhost:1313/tags/database/</link>
       <pubDate>Sun, 21 Aug 2022 11:52:42 +0700</pubDate>
-      <guid>https://khanh1998.github.io/tags/database/</guid>
+      <guid>http://localhost:1313/tags/database/</guid>
       <description></description>
     </item>
     <item>
       <title>Nodejs</title>
-      <link>https://khanh1998.github.io/tags/nodejs/</link>
+      <link>http://localhost:1313/tags/nodejs/</link>
       <pubDate>Sat, 28 May 2022 19:18:41 +0700</pubDate>
-      <guid>https://khanh1998.github.io/tags/nodejs/</guid>
+      <guid>http://localhost:1313/tags/nodejs/</guid>
       <description></description>
     </item>
     <item>
       <title>Os</title>
-      <link>https://khanh1998.github.io/tags/os/</link>
+      <link>http://localhost:1313/tags/os/</link>
       <pubDate>Sat, 28 May 2022 19:18:41 +0700</pubDate>
-      <guid>https://khanh1998.github.io/tags/os/</guid>
+      <guid>http://localhost:1313/tags/os/</guid>
+      <description></description>
+    </item>
+    <item>
+      <title>Git</title>
+      <link>http://localhost:1313/tags/git/</link>
+      <pubDate>Sat, 28 May 2022 14:32:58 +0700</pubDate>
+      <guid>http://localhost:1313/tags/git/</guid>
       <description></description>
     </item>
   </channel>

@@ -2,22 +2,22 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Rust on Khanh1998</title>
-    <link>https://khanh1998.github.io/tags/rust/</link>
+    <link>http://localhost:1313/tags/rust/</link>
     <description>Recent content in Rust on Khanh1998</description>
     <image>
       <title>Khanh1998</title>
-      <url>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
-      <link>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
+      <url>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
+      <link>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
     <lastBuildDate>Sun, 11 Dec 2022 13:33:55 +0700</lastBuildDate>
-    <atom:link href="https://khanh1998.github.io/tags/rust/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://localhost:1313/tags/rust/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>A Note About Rust Smart Pointer and Deref</title>
-      <link>https://khanh1998.github.io/posts/a-note-about-rust-smart-pointer-and-deref/</link>
+      <link>http://localhost:1313/posts/a-note-about-rust-smart-pointer-and-deref/</link>
       <pubDate>Sun, 11 Dec 2022 13:33:55 +0700</pubDate>
-      <guid>https://khanh1998.github.io/posts/a-note-about-rust-smart-pointer-and-deref/</guid>
+      <guid>http://localhost:1313/posts/a-note-about-rust-smart-pointer-and-deref/</guid>
       <description>&lt;p&gt;this article assumes you have some basic knowledge about &lt;a href=&#34;https://doc.rust-lang.org/book/ch15-00-smart-pointers.html&#34;&gt;Rust smart pointers&lt;/a&gt;.&lt;/p&gt;
 &lt;h2 id=&#34;the-dereference--operator&#34;&gt;the dereference (*) operator&lt;/h2&gt;
 &lt;p&gt;&lt;em&gt;dereference&lt;/em&gt; operator &lt;code&gt;*&lt;/code&gt; is used for getting the actual value from a reference:&lt;/p&gt;
