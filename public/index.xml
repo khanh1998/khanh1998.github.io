@@ -11,8 +11,19 @@
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Wed, 13 Nov 2024 13:58:54 +0700</lastBuildDate>
+    <lastBuildDate>Mon, 20 Jan 2025 11:56:55 +0700</lastBuildDate>
     <atom:link href="http://localhost:1313/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Postgres Advisory Locks</title>
+      <link>http://localhost:1313/posts/postgres-advisory-locks/</link>
+      <pubDate>Mon, 20 Jan 2025 11:56:55 +0700</pubDate>
+      <guid>http://localhost:1313/posts/postgres-advisory-locks/</guid>
+      <description>&lt;p&gt;This post is part of the series &lt;em&gt;Postgres for Everything&lt;/em&gt;.&lt;/p&gt;
+&lt;p&gt;Nowadays, we typically develop stateless applications, making it easier to scale them horizontally. However, locking is an essential tool to prevent race conditions in software development. In applications with multiple instances, programming language-level locks are insufficient because they only work locally within an instance. A centralized locking mechanism, valid across all instances, is required.&lt;/p&gt;
+&lt;h2 id=&#34;redis&#34;&gt;Redis&lt;/h2&gt;
+&lt;h3 id=&#34;setnx&#34;&gt;SETNX&lt;/h3&gt;
+&lt;p&gt;You can use &lt;a href=&#34;https://redis.io/docs/latest/commands/setnx/&#34;&gt;&lt;code&gt;SETNX&lt;/code&gt;&lt;/a&gt; to implement a simple lock. &lt;code&gt;SETNX&lt;/code&gt; sets a value for a key only if the key does not already exist.&lt;/p&gt;</description>
+    </item>
     <item>
       <title>Postgres Collation</title>
       <link>http://localhost:1313/posts/postgres-collation/</link>
@@ -328,16 +339,6 @@ the word &lt;em&gt;disjoin&lt;/em&gt; means &lt;em&gt;non-overlapping&lt;/em&gt;
 &lt;p&gt;NodeJS has one main thread called event-loop and it also has a worker pool to handle blocking IO and CPU-intensive tasks. The default number of threads in the worker pool is 4, and you can change it.&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;em&gt;Node.js uses a small number of threads to handle many clients. In Node.js there are two types of threads: one Event Loop (aka the main loop, main thread, event thread, etc.), and a pool of k Workers in a Worker Pool (aka the threadpool).&lt;/em&gt;&lt;/p&gt;</description>
-    </item>
-    <item>
-      <title>Note in Git</title>
-      <link>http://localhost:1313/posts/note-in-git/</link>
-      <pubDate>Sat, 28 May 2022 14:32:58 +0700</pubDate>
-      <guid>http://localhost:1313/posts/note-in-git/</guid>
-      <description>&lt;h2 id=&#34;what-is-a-branch&#34;&gt;What is a branch?&lt;/h2&gt;
-&lt;p&gt;A branch is just a pointer that point to a specific commit. Imagine your repository as a graph of commits, commits are identified by hash strings and be connected together. When you create a new branch, git creates a new pointer and points to the selected commit. Even when you delete a branch, the commit is still there.&lt;/p&gt;
-&lt;h2 id=&#34;what-is-the-head-pointer&#34;&gt;What is the HEAD pointer?&lt;/h2&gt;
-&lt;p&gt;&lt;code&gt;HEAD&lt;/code&gt; point to the current commit you are standing. By default &lt;code&gt;HEAD&lt;/code&gt; point to the newest commit of the current branch. When you checkout to a specific commit, &lt;code&gt;HEAD&lt;/code&gt; will change to point to that commit too.&lt;/p&gt;</description>
     </item>
     <item>
       <title>HashCode VS Equals</title>

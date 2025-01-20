@@ -11,8 +11,22 @@
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 21 Aug 2022 11:52:42 +0700</lastBuildDate>
+    <lastBuildDate>Wed, 13 Nov 2024 13:58:54 +0700</lastBuildDate>
     <atom:link href="http://localhost:1313/tags/database/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Postgres Collation</title>
+      <link>http://localhost:1313/posts/postgres-collation/</link>
+      <pubDate>Wed, 13 Nov 2024 13:58:54 +0700</pubDate>
+      <guid>http://localhost:1313/posts/postgres-collation/</guid>
+      <description>&lt;p&gt;From my &lt;a href=&#34;http://localhost:1313/posts/which-operator-is-faster-like-vs-equal/&#34;&gt;previous post&lt;/a&gt;, I realized that pattern matching operators (&lt;code&gt;LIKE&lt;/code&gt;, &lt;code&gt;ILIKE&lt;/code&gt;) do not utilize indexes. As I explored further, I came across the concept of collation and decided to take some notes in this post.&lt;/p&gt;
+&lt;h1 id=&#34;encoding&#34;&gt;Encoding&lt;/h1&gt;
+&lt;p&gt;Encoding maps human-readable characters to numbers so computers can understand them. Essentially, it assigns a unique number to each character. Common encodings include UTF-8 and ASCII.&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;ASCII&lt;/strong&gt;: Represents 256 unique characters.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;UTF-8&lt;/strong&gt;: Represents 1,112,064 characters, covering almost all characters from any language.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Most modern programming languages, such as Go, natively support UTF-8. Unlike ASCII, which uses 1 byte per character, UTF-8 uses up to 4 bytes. Strings in programming languages are typically represented as byte arrays. In ASCII, the number of bytes corresponds to the number of characters. However, this is not true for UTF-8.&lt;/p&gt;</description>
+    </item>
     <item>
       <title>Which operator is faster: like vs =</title>
       <link>http://localhost:1313/posts/which-operator-is-faster-like-vs-equal/</link>
