@@ -2,22 +2,22 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Go on Khanh1998</title>
-    <link>http://localhost:1313/tags/go/</link>
+    <link>https://khanh1998.github.io/tags/go/</link>
     <description>Recent content in Go on Khanh1998</description>
     <image>
       <title>Khanh1998</title>
-      <url>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
-      <link>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
+      <url>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
+      <link>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
     <lastBuildDate>Tue, 21 May 2024 14:24:03 +0700</lastBuildDate>
-    <atom:link href="http://localhost:1313/tags/go/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="https://khanh1998.github.io/tags/go/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>The pointer receiver and value receiver in Go are just syntax sugar</title>
-      <link>http://localhost:1313/posts/go-pointer-value-receiver/</link>
+      <link>https://khanh1998.github.io/posts/go-pointer-value-receiver/</link>
       <pubDate>Tue, 21 May 2024 14:24:03 +0700</pubDate>
-      <guid>http://localhost:1313/posts/go-pointer-value-receiver/</guid>
+      <guid>https://khanh1998.github.io/posts/go-pointer-value-receiver/</guid>
       <description>&lt;p&gt;If you are a Gopher, you probably heard some advice that goes like this: when you edit a value then use a pointer receiver, when you read use a value receiver. That’s not always correct and you should be careful when using them.&lt;/p&gt;
 &lt;h2 id=&#34;issue&#34;&gt;Issue&lt;/h2&gt;
 &lt;p&gt;Today I encountered an issue which can be simplified by the bellow code snippet:&lt;/p&gt;
@@ -109,9 +109,9 @@
     </item>
     <item>
       <title>Why would sometimes 0.1 &#43; 0.2 equals to 0.3, but sometimes it’s not in Go</title>
-      <link>http://localhost:1313/posts/go-untyped-constant/</link>
+      <link>https://khanh1998.github.io/posts/go-untyped-constant/</link>
       <pubDate>Sun, 10 Sep 2023 13:57:02 +0700</pubDate>
-      <guid>http://localhost:1313/posts/go-untyped-constant/</guid>
+      <guid>https://khanh1998.github.io/posts/go-untyped-constant/</guid>
       <description>&lt;p&gt;You may have heard about &lt;em&gt;0.1 + 0.2 != 0.3&lt;/em&gt; already, it’s a common issue in most programming languages. The reason behind that is the floating point (IEEE 754) as the computer can’t represent exactly a decimal in binary. By utilizing the floating point, the computer can hold a very large decimal, but the trade-off is it now can only represent the approximate of the true value.&lt;/p&gt;
 &lt;p&gt;However, in this post, I will not explain how floating point works but something else – &lt;a href=&#34;https://go.dev/blog/constants&#34;&gt;constant&lt;/a&gt;.&lt;/p&gt;</description>
     </item>

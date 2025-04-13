@@ -2,30 +2,43 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>Cs on Khanh1998</title>
-    <link>http://localhost:1313/tags/cs/</link>
+    <link>https://khanh1998.github.io/tags/cs/</link>
     <description>Recent content in Cs on Khanh1998</description>
     <image>
       <title>Khanh1998</title>
-      <url>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
-      <link>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
+      <url>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
+      <link>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
     </image>
     <generator>Hugo -- 0.136.5</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 10 Sep 2023 13:57:02 +0700</lastBuildDate>
-    <atom:link href="http://localhost:1313/tags/cs/index.xml" rel="self" type="application/rss+xml" />
+    <lastBuildDate>Fri, 11 Apr 2025 20:56:56 +0700</lastBuildDate>
+    <atom:link href="https://khanh1998.github.io/tags/cs/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Envelop Encryption</title>
+      <link>https://khanh1998.github.io/posts/envelop-encryption/</link>
+      <pubDate>Fri, 11 Apr 2025 20:56:56 +0700</pubDate>
+      <guid>https://khanh1998.github.io/posts/envelop-encryption/</guid>
+      <description>&lt;p&gt;To secure storing sensitive information, a common approach is to use &lt;strong&gt;envelope encryption&lt;/strong&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;A &lt;strong&gt;master key&lt;/strong&gt; (usually managed by a secure KMS)&lt;/li&gt;
+&lt;li&gt;A &lt;strong&gt;row-level key&lt;/strong&gt; (used to encrypt individual records)&lt;/li&gt;
+&lt;li&gt;Each row of sensitive data (e.g., credit card information) is encrypted using a unique row key, the row key itself is encrypted using the master key and stored alongside the data in the database.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;This setup allows secure key rotation, better isolation, and compliance with security standards.&lt;/p&gt;</description>
+    </item>
     <item>
       <title>Why would sometimes 0.1 &#43; 0.2 equals to 0.3, but sometimes it’s not in Go</title>
-      <link>http://localhost:1313/posts/go-untyped-constant/</link>
+      <link>https://khanh1998.github.io/posts/go-untyped-constant/</link>
       <pubDate>Sun, 10 Sep 2023 13:57:02 +0700</pubDate>
-      <guid>http://localhost:1313/posts/go-untyped-constant/</guid>
+      <guid>https://khanh1998.github.io/posts/go-untyped-constant/</guid>
       <description>&lt;p&gt;You may have heard about &lt;em&gt;0.1 + 0.2 != 0.3&lt;/em&gt; already, it’s a common issue in most programming languages. The reason behind that is the floating point (IEEE 754) as the computer can’t represent exactly a decimal in binary. By utilizing the floating point, the computer can hold a very large decimal, but the trade-off is it now can only represent the approximate of the true value.&lt;/p&gt;
 &lt;p&gt;However, in this post, I will not explain how floating point works but something else – &lt;a href=&#34;https://go.dev/blog/constants&#34;&gt;constant&lt;/a&gt;.&lt;/p&gt;</description>
     </item>
     <item>
       <title>A Note About Rust Smart Pointer and Deref</title>
-      <link>http://localhost:1313/posts/a-note-about-rust-smart-pointer-and-deref/</link>
+      <link>https://khanh1998.github.io/posts/a-note-about-rust-smart-pointer-and-deref/</link>
       <pubDate>Sun, 11 Dec 2022 13:33:55 +0700</pubDate>
-      <guid>http://localhost:1313/posts/a-note-about-rust-smart-pointer-and-deref/</guid>
+      <guid>https://khanh1998.github.io/posts/a-note-about-rust-smart-pointer-and-deref/</guid>
       <description>&lt;p&gt;this article assumes you have some basic knowledge about &lt;a href=&#34;https://doc.rust-lang.org/book/ch15-00-smart-pointers.html&#34;&gt;Rust smart pointers&lt;/a&gt;.&lt;/p&gt;
 &lt;h2 id=&#34;the-dereference--operator&#34;&gt;the dereference (*) operator&lt;/h2&gt;
 &lt;p&gt;&lt;em&gt;dereference&lt;/em&gt; operator &lt;code&gt;*&lt;/code&gt; is used for getting the actual value from a reference:&lt;/p&gt;

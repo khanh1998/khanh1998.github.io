@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Encryption on Khanh1998</title>
+    <link>https://khanh1998.github.io/tags/encryption/</link>
+    <description>Recent content in Encryption on Khanh1998</description>
+    <image>
+      <title>Khanh1998</title>
+      <url>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
+      <link>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
+    </image>
+    <generator>Hugo -- 0.136.5</generator>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 11 Apr 2025 20:56:56 +0700</lastBuildDate>
+    <atom:link href="https://khanh1998.github.io/tags/encryption/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Envelop Encryption</title>
+      <link>https://khanh1998.github.io/posts/envelop-encryption/</link>
+      <pubDate>Fri, 11 Apr 2025 20:56:56 +0700</pubDate>
+      <guid>https://khanh1998.github.io/posts/envelop-encryption/</guid>
+      <description>&lt;p&gt;To secure storing sensitive information, a common approach is to use &lt;strong&gt;envelope encryption&lt;/strong&gt;:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;A &lt;strong&gt;master key&lt;/strong&gt; (usually managed by a secure KMS)&lt;/li&gt;
+&lt;li&gt;A &lt;strong&gt;row-level key&lt;/strong&gt; (used to encrypt individual records)&lt;/li&gt;
+&lt;li&gt;Each row of sensitive data (e.g., credit card information) is encrypted using a unique row key, the row key itself is encrypted using the master key and stored alongside the data in the database.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;This setup allows secure key rotation, better isolation, and compliance with security standards.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>
