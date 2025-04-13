@@ -1,6 +1,7 @@
 ---
 date: '2025-04-11T20:56:56+07:00'
-draft: true
+draft: false
+tags: ['cs', 'encryption']
 title: 'Securely Storing Credit Card Information In Your Database'
 ---
 
