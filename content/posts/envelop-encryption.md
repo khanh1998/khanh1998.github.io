@@ -2,10 +2,10 @@
 date: '2025-04-11T20:56:56+07:00'
 draft: false
 tags: ['cs', 'encryption']
-title: 'Securely Storing Credit Card Information In Your Database'
+title: 'Envelop Encryption'
 ---
 
-To secure storing credit card information, a common approach is to use **envelope encryption**:
+To secure storing sensitive information, a common approach is to use **envelope encryption**:
 - A **master key** (usually managed by a secure KMS)
 - A **row-level key** (used to encrypt individual records)
 - Each row of sensitive data (e.g., credit card information) is encrypted using a unique row key, the row key itself is encrypted using the master key and stored alongside the data in the database.
