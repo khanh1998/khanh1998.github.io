@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>http://localhost:1313/ti%E1%BA%BFng%20vi%E1%BB%87t/categories/</loc>
+    <xhtml:link
+                rel="alternate"
+                hreflang="en"
+                href="http://localhost:1313/categories/"
+                />
+    <xhtml:link
+                rel="alternate"
+                hreflang="vi"
+                href="http://localhost:1313/vi/categories/"
+                />
+    <xhtml:link
+                rel="alternate"
+                hreflang="tiếng việt"
+                href="http://localhost:1313/ti%E1%BA%BFng%20vi%E1%BB%87t/categories/"
+                />
+  </url><url>
+    <loc>http://localhost:1313/ti%E1%BA%BFng%20vi%E1%BB%87t/</loc>
+    <xhtml:link
+                rel="alternate"
+                hreflang="en"
+                href="http://localhost:1313/"
+                />
+    <xhtml:link
+                rel="alternate"
+                hreflang="vi"
+                href="http://localhost:1313/vi/"
+                />
+    <xhtml:link
+                rel="alternate"
+                hreflang="tiếng việt"
+                href="http://localhost:1313/ti%E1%BA%BFng%20vi%E1%BB%87t/"
+                />
+  </url><url>
+    <loc>http://localhost:1313/ti%E1%BA%BFng%20vi%E1%BB%87t/tags/</loc>
+    <xhtml:link
+                rel="alternate"
+                hreflang="en"
+                href="http://localhost:1313/tags/"
+                />
+    <xhtml:link
+                rel="alternate"
+                hreflang="vi"
+                href="http://localhost:1313/vi/tags/"
+                />
+    <xhtml:link
+                rel="alternate"
+                hreflang="tiếng việt"
+                href="http://localhost:1313/ti%E1%BA%BFng%20vi%E1%BB%87t/tags/"
+                />
+  </url>
+</urlset>

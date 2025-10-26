@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Khanh1998</title>
+    <link>https://khanh1998.github.io/vi/</link>
+    <description>Recent content on Khanh1998</description>
+    <image>
+      <title>Khanh1998</title>
+      <url>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
+      <link>https://khanh1998.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
+    </image>
+    <generator>Hugo -- 0.147.2</generator>
+    <language>vi</language>
+    <lastBuildDate>Sun, 26 Oct 2025 11:50:08 +0700</lastBuildDate>
+    <atom:link href="https://khanh1998.github.io/vi/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Sơ lược về HDD và SSD</title>
+      <link>https://khanh1998.github.io/vi/posts/orverview-of-hdd-and-ssd/</link>
+      <pubDate>Sun, 26 Oct 2025 11:50:08 +0700</pubDate>
+      <guid>https://khanh1998.github.io/vi/posts/orverview-of-hdd-and-ssd/</guid>
+      <description>&lt;h2 id=&#34;hdd&#34;&gt;HDD&lt;/h2&gt;
+&lt;p&gt;Hai thành phần cấu tạo quan trọng của HDD là đĩa từ có thể quay được, và một đầu đọc/ghi có thể di chuyển.
+Đĩa từ được chia ra thành các vòng tròn đồng tâm, gọi là track. Mỗi track lại được chia ra thành các ô nhỏ gọi là sector.
+Mỗi sector thường có kích thước khoảng 512 byte, và sector cũng là đơn vị đọc ghi nhỏ nhất. Điều đó có nghĩa là dù bạn chỉ cần đọc/ghi một vài byte thì hệ thống vẫn phải đọc toàn bộ 521 byte của sector đó.
+Để có thể đọc hoặc ghi một sector bất kỳ, yêu cầu sự di chuyển của đầu đọc đến track cần đọc, và đĩa từ quay để đưa sector đến vị trí đầu đọc.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>

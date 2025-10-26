@@ -3,6 +3,16 @@ languageCode: en-us
 title: Khanh1998
 theme: ["PaperMod"]
 
+defaultContentLanguage: en
+defaultContentLanguageInSubdir: false
+languages:
+  en:
+    languageName: English
+    weight: 1
+  vi:
+    languageName: Tiếng Việt
+    weight: 2
+
 enableRobotsTXT: true
 buildDrafts: false
 buildFuture: false
