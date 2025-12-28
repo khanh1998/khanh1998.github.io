@@ -52,8 +52,29 @@ When during a transaction, you perform two queries, and the number of rows you g
 |select * from employee where age > 18 and age < 24;||
 |// 5 rows||
 |commit;||
-### 1.4 Serialization anomaly
+### 1.4 Serialization (write skew) anomaly
 [https://dba.stackexchange.com/a/315353](https://dba.stackexchange.com/a/315353)
+
+Assume there are two rows in the table `doctors` as following:
+
+| name | on_call |
+|------|---------|
+| Bob  | false   |
+| Alice| false   |
+
+There are two doctors in a hospital. The business require that there must be exactly one on call doctor every night. Both Alice and Bob open the web and see that there is no on call doctor, they therefore pick himself/herself as candidate if the other doesn't. The expected result is either Alice or Bob will be on call, not both. But for the write skew anomaly, it's possible that both will be on call.
+
+The transactions will happen like following:  
+
+| Transaction A (Alice) | Transaction B (Bob) |
+|-----------------------|---------------------|
+| begin transaction;    | begin Transaction;  |
+| select name, on_call from doctors; | select name, on_call from doctors; |
+| // Bob = false, Alice = false | // Bob = false, Alice = false |
+| update doctors set on_call = true where name = 'Alice' and not exists (select on_call from doctors where name = 'Bob' and on_call = true); | update doctors set on_call = true where name = 'Bob' and not exists (select on_call from doctors where name = 'Alice' and on_call = true); |
+| commit; | commit; |
+| // Bob = true, Alice = true | // Bob = true, Alice = true |
+
 ## 2. Isolation level
 ### 2.1 Read uncommitted
 Transaction A could see uncommitted changes from Transaction B, in other words, it allows** dirty read** to happen.
