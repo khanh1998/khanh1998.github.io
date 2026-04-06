@@ -3,7 +3,7 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://khanh1998.github.io/</loc>
-    <lastmod>2025-10-26T11:50:08+07:00</lastmod>
+    <lastmod>2026-04-06T22:31:21+07:00</lastmod>
     <xhtml:link
                 rel="alternate"
                 hreflang="vi"
@@ -13,6 +13,22 @@
                 rel="alternate"
                 hreflang="en"
                 href="https://khanh1998.github.io/"
+                />
+  </url><url>
+    <loc>https://khanh1998.github.io/posts/postgres-understand-select-for-update-vs-atomic-update/</loc>
+    <lastmod>2026-04-06T22:31:21+07:00</lastmod>
+  </url><url>
+    <loc>https://khanh1998.github.io/posts/</loc>
+    <lastmod>2026-04-06T22:31:21+07:00</lastmod>
+    <xhtml:link
+                rel="alternate"
+                hreflang="vi"
+                href="https://khanh1998.github.io/vi/posts/"
+                />
+    <xhtml:link
+                rel="alternate"
+                hreflang="en"
+                href="https://khanh1998.github.io/posts/"
                 />
   </url><url>
     <loc>https://khanh1998.github.io/posts/orverview-of-hdd-and-ssd/</loc>
@@ -26,19 +42,6 @@
                 rel="alternate"
                 hreflang="en"
                 href="https://khanh1998.github.io/posts/orverview-of-hdd-and-ssd/"
-                />
-  </url><url>
-    <loc>https://khanh1998.github.io/posts/</loc>
-    <lastmod>2025-10-26T11:50:08+07:00</lastmod>
-    <xhtml:link
-                rel="alternate"
-                hreflang="vi"
-                href="https://khanh1998.github.io/vi/posts/"
-                />
-    <xhtml:link
-                rel="alternate"
-                hreflang="en"
-                href="https://khanh1998.github.io/posts/"
                 />
   </url><url>
     <loc>https://khanh1998.github.io/tags/cs/</loc>

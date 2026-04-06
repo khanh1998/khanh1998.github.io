@@ -11,8 +11,17 @@
     </image>
     <generator>Hugo -- 0.147.2</generator>
     <language>en</language>
-    <lastBuildDate>Sun, 26 Oct 2025 11:50:08 +0700</lastBuildDate>
+    <lastBuildDate>Mon, 06 Apr 2026 22:31:21 +0700</lastBuildDate>
     <atom:link href="https://khanh1998.github.io/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Postgres Locking Internals: Comparing `UPDATE` and `SELECT ... FOR UPDATE`</title>
+      <link>https://khanh1998.github.io/posts/postgres-understand-select-for-update-vs-atomic-update/</link>
+      <pubDate>Mon, 06 Apr 2026 22:31:21 +0700</pubDate>
+      <guid>https://khanh1998.github.io/posts/postgres-understand-select-for-update-vs-atomic-update/</guid>
+      <description>&lt;p&gt;Recently I learned that Postgres holds a lock on the rows it updates during a transaction and only releases it when the transaction finishes (commit/rollback).&lt;/p&gt;
+&lt;p&gt;This surprised me because I always use &lt;code&gt;select ... for update&lt;/code&gt; to lock the row before updating it in a transaction. I thought that other transactions could concurrently update the row that my current transaction is updating, causing a race condition.&lt;/p&gt;
+&lt;p&gt;For example, I have this simple &lt;code&gt;users&lt;/code&gt; table:&lt;/p&gt;</description>
+    </item>
     <item>
       <title>Overview of HDD and SSD</title>
       <link>https://khanh1998.github.io/posts/orverview-of-hdd-and-ssd/</link>

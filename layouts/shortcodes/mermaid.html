@@ -1,0 +1,12 @@
+{{- $mermaidCode := trim .Inner "\n" -}}
+{{- $theme := .Get "theme" | default "" -}}
+{{- $fontSize := .Get "fontSize" | default "" -}}
+{{- $id := printf "mermaid-%d" (now.UnixNano) -}}
+
+<div class="mermaid" id="{{ $id }}"
+  {{- if $theme }} data-theme="{{ $theme }}"{{ end -}}
+  {{- if $fontSize }} data-font-size="{{ $fontSize }}"{{ end -}}
+>
+{{ $mermaidCode | safeHTML }}
+</div>
+

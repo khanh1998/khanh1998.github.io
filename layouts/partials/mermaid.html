@@ -1,0 +1,39 @@
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  
+  // Check for dark mode
+  const isDark = document.body.classList.contains('dark') || 
+                 (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && 
+                  !document.body.classList.contains('light'));
+  
+  const defaultTheme = isDark ? 'dark' : 'default';
+
+  // Find all mermaid divs and render each one
+  const mermaidDivs = document.querySelectorAll('.mermaid');
+  
+  for (let i = 0; i < mermaidDivs.length; i++) {
+    const div = mermaidDivs[i];
+    const theme = div.dataset.theme || defaultTheme;
+    const fontSize = div.dataset.fontSize || '20px';
+    const code = div.textContent.trim();
+    const id = 'mermaid-svg-' + i;
+    
+    // Re-initialize mermaid with this diagram's config
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: theme,
+      themeVariables: {
+        fontSize: fontSize
+      }
+    });
+    
+    try {
+      const { svg } = await mermaid.render(id, code);
+      div.innerHTML = svg;
+    } catch (e) {
+      console.error('Mermaid error:', e);
+      div.innerHTML = '<pre style="color:red;">' + e.message + '</pre>';
+    }
+  }
+</script>
