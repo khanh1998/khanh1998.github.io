@@ -5,3 +5,7 @@
 {{ if or .Params.mermaid .Site.Params.mermaid }}
 {{ partial "mermaid.html" . }}
 {{ end }}
+
+{{ if or .Params.chartjs .Site.Params.chartjs }}
+{{ partial "chartjs.html" . }}
+{{ end }}
