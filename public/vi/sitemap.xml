@@ -2,67 +2,67 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://khanh1998.github.io/vi/</loc>
+    <loc>http://localhost:1313/vi/</loc>
     <lastmod>2025-10-26T11:50:08+07:00</lastmod>
     <xhtml:link
                 rel="alternate"
-                hreflang="en"
-                href="https://khanh1998.github.io/"
+                hreflang="en-us"
+                href="http://localhost:1313/"
                 />
     <xhtml:link
                 rel="alternate"
                 hreflang="vi"
-                href="https://khanh1998.github.io/vi/"
+                href="http://localhost:1313/vi/"
                 />
   </url><url>
-    <loc>https://khanh1998.github.io/vi/posts/</loc>
+    <loc>http://localhost:1313/vi/posts/</loc>
     <lastmod>2025-10-26T11:50:08+07:00</lastmod>
     <xhtml:link
                 rel="alternate"
-                hreflang="en"
-                href="https://khanh1998.github.io/posts/"
+                hreflang="en-us"
+                href="http://localhost:1313/posts/"
                 />
     <xhtml:link
                 rel="alternate"
                 hreflang="vi"
-                href="https://khanh1998.github.io/vi/posts/"
+                href="http://localhost:1313/vi/posts/"
                 />
   </url><url>
-    <loc>https://khanh1998.github.io/vi/posts/orverview-of-hdd-and-ssd/</loc>
+    <loc>http://localhost:1313/vi/posts/orverview-of-hdd-and-ssd/</loc>
     <lastmod>2025-10-26T11:50:08+07:00</lastmod>
     <xhtml:link
                 rel="alternate"
-                hreflang="en"
-                href="https://khanh1998.github.io/posts/orverview-of-hdd-and-ssd/"
+                hreflang="en-us"
+                href="http://localhost:1313/posts/orverview-of-hdd-and-ssd/"
                 />
     <xhtml:link
                 rel="alternate"
                 hreflang="vi"
-                href="https://khanh1998.github.io/vi/posts/orverview-of-hdd-and-ssd/"
+                href="http://localhost:1313/vi/posts/orverview-of-hdd-and-ssd/"
                 />
   </url><url>
-    <loc>https://khanh1998.github.io/vi/categories/</loc>
+    <loc>http://localhost:1313/vi/categories/</loc>
     <xhtml:link
                 rel="alternate"
-                hreflang="en"
-                href="https://khanh1998.github.io/categories/"
+                hreflang="en-us"
+                href="http://localhost:1313/categories/"
                 />
     <xhtml:link
                 rel="alternate"
                 hreflang="vi"
-                href="https://khanh1998.github.io/vi/categories/"
+                href="http://localhost:1313/vi/categories/"
                 />
   </url><url>
-    <loc>https://khanh1998.github.io/vi/tags/</loc>
+    <loc>http://localhost:1313/vi/tags/</loc>
     <xhtml:link
                 rel="alternate"
-                hreflang="en"
-                href="https://khanh1998.github.io/tags/"
+                hreflang="en-us"
+                href="http://localhost:1313/tags/"
                 />
     <xhtml:link
                 rel="alternate"
                 hreflang="vi"
-                href="https://khanh1998.github.io/vi/tags/"
+                href="http://localhost:1313/vi/tags/"
                 />
   </url>
 </urlset>

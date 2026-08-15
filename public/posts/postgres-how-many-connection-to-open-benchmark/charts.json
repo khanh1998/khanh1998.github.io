@@ -1,57 +1,125 @@
 {
-  "tps_latency": {
+  "write_heavy_latency": {
     "type": "line",
     "data": {
-      "labels": ["c2", "c4", "c8", "c16", "c32"],
+      "labels": [
+        "c16",
+        "c32",
+        "c64",
+        "c128",
+        "c256",
+        "c512",
+        "c1024"
+      ],
       "datasets": [
         {
-          "label": "TPS",
-          "data": [356.81, 676.74, 1357.28, 2204.81, 2421.58],
-          "yAxisID": "y",
-          "borderColor": "#22c55e",
-          "backgroundColor": "rgba(34, 197, 94, 0.1)",
-          "tension": 0.4,
-          "fill": true
-        },
-        {
           "label": "Avg Latency (ms)",
-          "data": [5.605, 5.908, 5.891, 7.248, 13.197],
-          "yAxisID": "y1",
+          "data": [
+            5.186,
+            5.019,
+            6.971,
+            10.827,
+            19.415,
+            40.029,
+            85.088
+          ],
+          "yAxisID": "y",
           "borderColor": "#ef4444",
           "backgroundColor": "rgba(239, 68, 68, 0.1)",
           "tension": 0.4,
           "fill": true
+        },
+        {
+          "label": "Latency Growth Ratio (latency[n] / latency[n-1], ideal ≤ 1.0)",
+          "data": [
+            null,
+            0.968,
+            1.389,
+            1.553,
+            1.793,
+            2.061,
+            2.126
+          ],
+          "yAxisID": "y1",
+          "borderColor": "#f97316",
+          "backgroundColor": "rgba(249, 115, 22, 0.1)",
+          "tension": 0.4,
+          "fill": false,
+          "borderDash": [
+            5,
+            5
+          ]
         }
       ]
     },
     "options": {
       "responsive": true,
-      "interaction": {"mode": "index", "intersect": false},
+      "plugins": {
+        "title": {
+          "display": true,
+          "text": "Latency vs Connections (Write Heavy)"
+        },
+        "subtitle": {
+          "display": true,
+          "text": "Each step doubles connections. Growth ratio > 1 means latency is increasing faster than connections.",
+          "padding": {
+            "bottom": 10
+          }
+        }
+      },
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
       "scales": {
         "y": {
           "type": "linear",
           "display": true,
           "position": "left",
-          "title": {"display": true, "text": "TPS"}
+          "title": {
+            "display": true,
+            "text": "Avg Latency (ms)"
+          }
         },
         "y1": {
           "type": "linear",
           "display": true,
           "position": "right",
-          "title": {"display": true, "text": "Latency (ms)"},
-          "grid": {"drawOnChartArea": false}
+          "title": {
+            "display": true,
+            "text": "Latency Growth Ratio (x)"
+          },
+          "grid": {
+            "drawOnChartArea": false
+          }
         }
       }
     }
   },
-  "tps_latency_pipeline": {
+  "write_heavy_tps": {
     "type": "line",
     "data": {
-      "labels": ["c2", "c4", "c8", "c16", "c32"],
+      "labels": [
+        "c16",
+        "c32",
+        "c64",
+        "c128",
+        "c256",
+        "c512",
+        "c1024"
+      ],
       "datasets": [
         {
           "label": "TPS",
-          "data": [1111.25, 1941.22, 3349.19, 4558.39, 4612.74],
+          "data": [
+            3085.11,
+            6365.24,
+            9169.62,
+            11808.88,
+            13150.34,
+            12719.56,
+            11967.83
+          ],
           "yAxisID": "y",
           "borderColor": "#22c55e",
           "backgroundColor": "rgba(34, 197, 94, 0.1)",
@@ -59,340 +127,964 @@
           "fill": true
         },
         {
-          "label": "Avg Latency (ms)",
-          "data": [1.799, 2.059, 2.383, 3.502, 6.920],
+          "label": "TPS Gain Ratio (TPS[n] / TPS[n-1], ideal = 2.0)",
+          "data": [
+            null,
+            2.063,
+            1.440,
+            1.288,
+            1.114,
+            0.967,
+            0.941
+          ],
           "yAxisID": "y1",
-          "borderColor": "#ef4444",
-          "backgroundColor": "rgba(239, 68, 68, 0.1)",
+          "borderColor": "#3b82f6",
+          "backgroundColor": "rgba(59, 130, 246, 0.1)",
           "tension": 0.4,
-          "fill": true
+          "fill": false,
+          "borderDash": [
+            5,
+            5
+          ]
         }
       ]
     },
     "options": {
       "responsive": true,
-      "interaction": {"mode": "index", "intersect": false},
+      "plugins": {
+        "title": {
+          "display": true,
+          "text": "TPS vs Connections (Write Heavy)"
+        },
+        "subtitle": {
+          "display": true,
+          "text": "Each step doubles connections. Gain ratio = 2.0 means TPS doubled too; < 1.0 means TPS dropped.",
+          "padding": {
+            "bottom": 10
+          }
+        }
+      },
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
       "scales": {
         "y": {
           "type": "linear",
           "display": true,
           "position": "left",
-          "title": {"display": true, "text": "TPS"}
+          "title": {
+            "display": true,
+            "text": "TPS"
+          }
         },
         "y1": {
           "type": "linear",
           "display": true,
           "position": "right",
-          "title": {"display": true, "text": "Latency (ms)"},
-          "grid": {"drawOnChartArea": false}
-        }
-      }
-    }
-  },
-  "peak_cpu": {
-    "type": "line",
-    "data": {
-      "labels": ["c2", "c4", "c8", "c16", "c32"],
-      "datasets": [
-        {
-          "label": "CPU Total",
-          "data": [28.7, 47.9, 72.20, 91.20, 99.40],
-          "borderColor": "#2563eb",
-          "backgroundColor": "rgba(37, 99, 235, 0.12)",
-          "pointBackgroundColor": "#2563eb",
-          "tension": 0.35,
-          "fill": false,
-          "borderWidth": 2
-        },
-        {
-          "label": "CPU User",
-          "data": [3.3, 3.4, 2.4, 2.3, 4.6],
-          "borderColor": "#16a34a",
-          "backgroundColor": "rgba(22, 163, 74, 0.12)",
-          "pointBackgroundColor": "#16a34a",
-          "tension": 0.35,
-          "fill": false,
-          "borderWidth": 2
-        },
-        {
-          "label": "CPU System",
-          "data": [5.9, 8.9, 13.30, 21.20, 25.60],
-          "borderColor": "#ea580c",
-          "backgroundColor": "rgba(234, 88, 12, 0.12)",
-          "pointBackgroundColor": "#ea580c",
-          "tension": 0.35,
-          "fill": false,
-          "borderWidth": 2
-        },
-        {
-          "label": "CPU Nice",
-          "data": [7.2, 14.8, 28.4, 45.3, 54.8],
-          "borderColor": "#7c3aed",
-          "backgroundColor": "rgba(124, 58, 237, 0.12)",
-          "pointBackgroundColor": "#7c3aed",
-          "tension": 0.35,
-          "fill": false,
-          "borderWidth": 2
-        },
-        {
-          "label": "CPU Wait",
-          "data": [9.5, 15.4, 17.3, 7.4, 0.8],
-          "borderColor": "#dc2626",
-          "backgroundColor": "rgba(220, 38, 38, 0.12)",
-          "pointBackgroundColor": "#dc2626",
-          "tension": 0.35,
-          "fill": false,
-          "borderWidth": 2
-        }
-      ]
-    },
-    "options": {
-      "responsive": true,
-      "interaction": {"mode": "index", "intersect": false},
-      "scales": {
-        "y": {
-          "beginAtZero": true,
-          "max": 100,
           "title": {
             "display": true,
-            "text": "CPU (%)"
-          }
-        },
-        "x": {
-          "title": {
-            "display": true,
-            "text": "Connection Count"
+            "text": "TPS Gain Ratio (x)"
+          },
+          "grid": {
+            "drawOnChartArea": false
           }
         }
       }
     }
   },
-  "peak_cpu_pipeline": {
-    "type": "line",
+  "top_wait_event_count": {
+    "type": "bar",
     "data": {
-      "labels": ["c2", "c4", "c8", "c16", "c32"],
+      "labels": [
+        "c16",
+        "c32",
+        "c64",
+        "c128",
+        "c256",
+        "c512",
+        "c1024"
+      ],
       "datasets": [
         {
-          "label": "CPU Total",
-          "data": [53.5, 66, 79, 92.6, 96.8],
-          "borderColor": "#2563eb",
-          "backgroundColor": "rgba(37, 99, 235, 0.12)",
-          "pointBackgroundColor": "#2563eb",
-          "tension": 0.35,
-          "fill": false,
-          "borderWidth": 2
+          "label": "LWLock · WALWrite",
+          "data": [
+            70,
+            142,
+            292,
+            426,
+            830,
+            1687,
+            1950
+          ],
+          "backgroundColor": "rgba(53,91,182,0.8)"
         },
         {
-          "label": "CPU User",
-          "data": [2.6, 2.6, 2.7, 5.0, 5.7],
-          "borderColor": "#16a34a",
-          "backgroundColor": "rgba(22, 163, 74, 0.12)",
-          "pointBackgroundColor": "#16a34a",
-          "tension": 0.35,
-          "fill": false,
-          "borderWidth": 2
+          "label": "CPU · running",
+          "data": [
+            34,
+            30,
+            34,
+            59,
+            37,
+            73,
+            111
+          ],
+          "backgroundColor": "rgba(14,53,170,0.8)"
         },
         {
-          "label": "CPU System",
-          "data": [5.7, 8.5, 11.9, 16.0, 18.7],
-          "borderColor": "#ea580c",
-          "backgroundColor": "rgba(234, 88, 12, 0.12)",
-          "pointBackgroundColor": "#ea580c",
-          "tension": 0.35,
-          "fill": false,
-          "borderWidth": 2
+          "label": "Client · ClientRead",
+          "data": [
+            21,
+            29,
+            35,
+            88,
+            119,
+            352,
+            555
+          ],
+          "backgroundColor": "rgba(192,132,12,0.8)"
         },
         {
-          "label": "CPU Nice",
-          "data": [12.3, 21.0, 36.1, 54.3, 60.1],
-          "borderColor": "#7c3aed",
-          "backgroundColor": "rgba(124, 58, 237, 0.12)",
-          "pointBackgroundColor": "#7c3aed",
-          "tension": 0.35,
-          "fill": false,
-          "borderWidth": 2
+          "label": "IO · WalSync",
+          "data": [
+            10,
+            8,
+            7,
+            6,
+            10,
+            6,
+            6
+          ],
+          "backgroundColor": "rgba(170,201,13,0.8)"
         },
         {
-          "label": "CPU Wait",
-          "data": [30.3, 29.3, 21.0, 8.2, 3.5],
-          "borderColor": "#dc2626",
-          "backgroundColor": "rgba(220, 38, 38, 0.12)",
-          "pointBackgroundColor": "#dc2626",
-          "tension": 0.35,
-          "fill": false,
-          "borderWidth": 2
+          "label": "IO · DataFileExtend",
+          "data": [
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "backgroundColor": "rgba(44,201,13,0.8)"
+        },
+        {
+          "label": "LWLock · BufferContent",
+          "data": [
+            0,
+            1,
+            14,
+            50,
+            371,
+            1597,
+            5015
+          ],
+          "backgroundColor": "rgba(154,53,182,0.8)"
+        },
+        {
+          "label": "LWLock · WALInsert",
+          "data": [
+            0,
+            0,
+            9,
+            0,
+            4,
+            6,
+            212
+          ],
+          "backgroundColor": "rgba(182,53,59,0.8)"
+        },
+        {
+          "label": "Lock · transactionid",
+          "data": [
+            0,
+            0,
+            2,
+            2,
+            16,
+            90,
+            296
+          ],
+          "backgroundColor": "rgba(213,21,181,0.8)"
+        },
+        {
+          "label": "IPC · ProcarrayGroupUpdate",
+          "data": [
+            0,
+            0,
+            0,
+            2,
+            11,
+            61,
+            225
+          ],
+          "backgroundColor": "rgba(39,16,158,0.8)"
+        },
+        {
+          "label": "IO · WalWrite",
+          "data": [
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0
+          ],
+          "backgroundColor": "rgba(13,201,91,0.8)"
+        },
+        {
+          "label": "Lock · extend",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            3,
+            0,
+            0
+          ],
+          "backgroundColor": "rgba(21,149,213,0.8)"
+        },
+        {
+          "label": "LWLock · ProcArray",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            2,
+            8,
+            4
+          ],
+          "backgroundColor": "rgba(53,182,111,0.8)"
+        },
+        {
+          "label": "Timeout · VacuumDelay",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            3,
+            0
+          ],
+          "backgroundColor": "rgba(193,207,48,0.8)"
+        },
+        {
+          "label": "Lock · tuple",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "backgroundColor": "rgba(133,21,213,0.8)"
+        },
+        {
+          "label": "Timeout · SpinDelay",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            65
+          ],
+          "backgroundColor": "rgba(48,207,193,0.8)"
+        },
+        {
+          "label": "LWLock · XidGen",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            7
+          ],
+          "backgroundColor": "rgba(182,53,59,0.8)"
         }
       ]
     },
     "options": {
-      "responsive": true,
-      "interaction": {"mode": "index", "intersect": false},
+      "plugins": {
+        "title": {
+          "display": true,
+          "text": "Top Wait Events by Count"
+        }
+      },
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
       "scales": {
-        "y": {
-          "beginAtZero": true,
-          "max": 100,
-          "title": {
-            "display": true,
-            "text": "CPU (%)"
-          }
-        },
         "x": {
-          "title": {
-            "display": true,
-            "text": "Connection Count"
-          }
+          "stacked": true
+        },
+        "y": {
+          "stacked": true
         }
       }
     }
   },
-  "load_avg": {
-    "type": "line",
+  "top_wait_event_count_broad_view": {
+    "type": "bar",
     "data": {
-      "labels": ["c2", "c4", "c8", "c16", "c32"],
+      "labels": [
+        "c16",
+        "c32",
+        "c64",
+        "c128",
+        "c256",
+        "c512",
+        "c1024"
+      ],
       "datasets": [
         {
-          "label": "Load Average 1m",
-          "data": [0.49, 0.53, 1.27, 5.55, 17.57],
-          "borderColor": "#f59e0b",
-          "backgroundColor": "rgba(245, 158, 11, 0.1)",
-          "tension": 0.4,
-          "fill": true,
-          "borderWidth": 2,
-          "pointBackgroundColor": "#f59e0b"
+          "label": "LWLock",
+          "data": [
+            70,
+            143,
+            315,
+            476,
+            1207,
+            3298,
+            7188
+          ],
+          "backgroundColor": "rgba(182,53,135,0.8)"
+        },
+        {
+          "label": "CPU",
+          "data": [
+            34,
+            30,
+            34,
+            59,
+            37,
+            73,
+            111
+          ],
+          "backgroundColor": "rgba(170,14,66,0.8)"
+        },
+        {
+          "label": "Client",
+          "data": [
+            21,
+            29,
+            35,
+            88,
+            119,
+            352,
+            555
+          ],
+          "backgroundColor": "rgba(192,132,12,0.8)"
+        },
+        {
+          "label": "IO",
+          "data": [
+            10,
+            9,
+            7,
+            7,
+            10,
+            6,
+            6
+          ],
+          "backgroundColor": "rgba(44,201,13,0.8)"
+        },
+        {
+          "label": "Lock",
+          "data": [
+            0,
+            0,
+            2,
+            2,
+            19,
+            91,
+            296
+          ],
+          "backgroundColor": "rgba(213,69,21,0.8)"
+        },
+        {
+          "label": "IPC",
+          "data": [
+            0,
+            0,
+            0,
+            2,
+            11,
+            61,
+            225
+          ],
+          "backgroundColor": "rgba(16,75,158,0.8)"
+        },
+        {
+          "label": "Timeout",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            3,
+            65
+          ],
+          "backgroundColor": "rgba(88,207,48,0.8)"
         }
       ]
     },
     "options": {
-      "responsive": true,
-      "interaction": {"mode": "index", "intersect": false},
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
       "scales": {
-        "y": {
-          "beginAtZero": true,
-          "title": {"display": true, "text": "Load Average (1m)"}
-        },
         "x": {
-          "title": {"display": true, "text": "Connection Count"}
+          "stacked": true
+        },
+        "y": {
+          "stacked": true
         }
       }
     }
   },
-  "load_avg_pipeline": {
-    "type": "line",
+  "top_wait_event_percent": {
+    "type": "bar",
     "data": {
-      "labels": ["c2", "c4", "c8", "c16", "c32"],
+      "labels": [
+        "c16",
+        "c32",
+        "c64",
+        "c128",
+        "c256",
+        "c512",
+        "c1024"
+      ],
       "datasets": [
         {
-          "label": "Load Average 1m",
-          "data": [1.18, 1.81, 3.04, 5.8, 14.1],
-          "borderColor": "#f59e0b",
-          "backgroundColor": "rgba(245, 158, 11, 0.1)",
-          "tension": 0.4,
-          "fill": true,
-          "borderWidth": 2,
-          "pointBackgroundColor": "#f59e0b"
+          "label": "LWLock · WALWrite",
+          "data": [
+            51.8519,
+            67.2986,
+            74.3003,
+            67.1924,
+            59.1589,
+            43.4346,
+            23.0879
+          ],
+          "backgroundColor": "rgba(53,91,182,0.8)"
+        },
+        {
+          "label": "CPU · running",
+          "data": [
+            25.1852,
+            14.218,
+            8.6514,
+            9.306,
+            2.6372,
+            1.8795,
+            1.3142
+          ],
+          "backgroundColor": "rgba(14,53,170,0.8)"
+        },
+        {
+          "label": "Client · ClientRead",
+          "data": [
+            15.5556,
+            13.7441,
+            8.9059,
+            13.8801,
+            8.4818,
+            9.0628,
+            6.5712
+          ],
+          "backgroundColor": "rgba(192,132,12,0.8)"
+        },
+        {
+          "label": "IO · WalSync",
+          "data": [
+            7.4074,
+            3.7915,
+            1.7812,
+            0.9464,
+            0.7128,
+            0.1545,
+            0.071
+          ],
+          "backgroundColor": "rgba(170,201,13,0.8)"
+        },
+        {
+          "label": "IO · DataFileExtend",
+          "data": [
+            0,
+            0.4739,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "backgroundColor": "rgba(44,201,13,0.8)"
+        },
+        {
+          "label": "LWLock · BufferContent",
+          "data": [
+            0,
+            0.4739,
+            3.5623,
+            7.8864,
+            26.4433,
+            41.1174,
+            59.3772
+          ],
+          "backgroundColor": "rgba(154,53,182,0.8)"
+        },
+        {
+          "label": "LWLock · WALInsert",
+          "data": [
+            0,
+            0,
+            2.2901,
+            0,
+            0.2851,
+            0.1545,
+            2.5101
+          ],
+          "backgroundColor": "rgba(182,53,59,0.8)"
+        },
+        {
+          "label": "Lock · transactionid",
+          "data": [
+            0,
+            0,
+            0.5089,
+            0.3155,
+            1.1404,
+            2.3172,
+            3.5046
+          ],
+          "backgroundColor": "rgba(213,21,181,0.8)"
+        },
+        {
+          "label": "IPC · ProcarrayGroupUpdate",
+          "data": [
+            0,
+            0,
+            0,
+            0.3155,
+            0.784,
+            1.5705,
+            2.664
+          ],
+          "backgroundColor": "rgba(39,16,158,0.8)"
+        },
+        {
+          "label": "IO · WalWrite",
+          "data": [
+            0,
+            0,
+            0,
+            0.1577,
+            0,
+            0,
+            0
+          ],
+          "backgroundColor": "rgba(13,201,91,0.8)"
+        },
+        {
+          "label": "Lock · extend",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0.2138,
+            0,
+            0
+          ],
+          "backgroundColor": "rgba(21,149,213,0.8)"
+        },
+        {
+          "label": "LWLock · ProcArray",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0.1426,
+            0.206,
+            0.0474
+          ],
+          "backgroundColor": "rgba(53,182,111,0.8)"
+        },
+        {
+          "label": "Timeout · VacuumDelay",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0.0772,
+            0
+          ],
+          "backgroundColor": "rgba(193,207,48,0.8)"
+        },
+        {
+          "label": "Lock · tuple",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0.0257,
+            0
+          ],
+          "backgroundColor": "rgba(133,21,213,0.8)"
+        },
+        {
+          "label": "Timeout · SpinDelay",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0.7696
+          ],
+          "backgroundColor": "rgba(48,207,193,0.8)"
+        },
+        {
+          "label": "LWLock · XidGen",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0.0829
+          ],
+          "backgroundColor": "rgba(182,53,59,0.8)"
         }
       ]
     },
     "options": {
-      "responsive": true,
-      "interaction": {"mode": "index", "intersect": false},
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
       "scales": {
-        "y": {
-          "beginAtZero": true,
-          "title": {"display": true, "text": "Load Average (1m)"}
-        },
         "x": {
-          "title": {"display": true, "text": "Connection Count"}
+          "stacked": true
+        },
+        "y": {
+          "stacked": true
         }
       }
     }
   },
-  "tps_stddev": {
-    "type": "line",
+  "top_wait_event_percent_broad_view": {
+    "type": "bar",
     "data": {
-      "labels": ["c2", "c4", "c8", "c16", "c32"],
+      "labels": [
+        "c16",
+        "c32",
+        "c64",
+        "c128",
+        "c256",
+        "c512",
+        "c1024"
+      ],
       "datasets": [
         {
-          "label": "TPS",
-          "data": [356.81, 676.74, 1357.28, 2204.81, 2421.58],
-          "yAxisID": "y",
-          "borderColor": "#22c55e",
-          "backgroundColor": "rgba(34, 197, 94, 0.1)",
-          "tension": 0.4,
-          "fill": true
+          "label": "LWLock",
+          "data": [
+            51.8519,
+            67.7725,
+            80.1527,
+            75.0789,
+            86.0299,
+            84.9125,
+            85.1054
+          ],
+          "backgroundColor": "rgba(182,53,135,0.8)"
         },
         {
-          "label": "Latency StdDev (ms)",
-          "data": [9.844, 5.584, 4.872, 6.402, 13.453],
-          "yAxisID": "y1",
-          "borderColor": "#f59e0b",
-          "backgroundColor": "rgba(245, 158, 11, 0.1)",
-          "tension": 0.4,
-          "fill": true
+          "label": "CPU",
+          "data": [
+            25.1852,
+            14.218,
+            8.6514,
+            9.306,
+            2.6372,
+            1.8795,
+            1.3142
+          ],
+          "backgroundColor": "rgba(170,14,66,0.8)"
+        },
+        {
+          "label": "Client",
+          "data": [
+            15.5556,
+            13.7441,
+            8.9059,
+            13.8801,
+            8.4818,
+            9.0628,
+            6.5712
+          ],
+          "backgroundColor": "rgba(192,132,12,0.8)"
+        },
+        {
+          "label": "IO",
+          "data": [
+            7.4074,
+            4.2654,
+            1.7812,
+            1.1041,
+            0.7128,
+            0.1545,
+            0.071
+          ],
+          "backgroundColor": "rgba(44,201,13,0.8)"
+        },
+        {
+          "label": "Lock",
+          "data": [
+            0,
+            0,
+            0.5089,
+            0.3155,
+            1.3542,
+            2.3429,
+            3.5046
+          ],
+          "backgroundColor": "rgba(213,69,21,0.8)"
+        },
+        {
+          "label": "IPC",
+          "data": [
+            0,
+            0,
+            0,
+            0.3155,
+            0.784,
+            1.5705,
+            2.664
+          ],
+          "backgroundColor": "rgba(16,75,158,0.8)"
+        },
+        {
+          "label": "Timeout",
+          "data": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0.0772,
+            0.7696
+          ],
+          "backgroundColor": "rgba(88,207,48,0.8)"
         }
       ]
     },
     "options": {
-      "responsive": true,
-      "interaction": {"mode": "index", "intersect": false},
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
       "scales": {
-        "y": {
-          "type": "linear",
-          "display": true,
-          "position": "left",
-          "title": {"display": true, "text": "TPS"}
+        "x": {
+          "stacked": true
         },
-        "y1": {
-          "type": "linear",
-          "display": true,
-          "position": "right",
-          "title": {"display": true, "text": "Latency StdDev (ms)"},
-          "grid": {"drawOnChartArea": false}
+        "y": {
+          "stacked": true
         }
       }
     }
   },
-  "tps_stddev_pipeline": {
-    "type": "line",
+  "psi_cpu_some": {
+    "type": "barWithErrorBars",
     "data": {
-      "labels": ["c2", "c4", "c8", "c16", "c32"],
+      "labels": [
+        "c16",
+        "c32",
+        "c64",
+        "c128",
+        "c256",
+        "c512",
+        "c1024"
+      ],
       "datasets": [
         {
-          "label": "TPS",
-          "data": [1111.25, 1941.22, 3349.19, 4558.39, 4612.74],
-          "yAxisID": "y",
-          "borderColor": "#22c55e",
-          "backgroundColor": "rgba(34, 197, 94, 0.1)",
-          "tension": 0.4,
-          "fill": true
-        },
-        {
-          "label": "Latency StdDev (ms)",
-          "data": [1.086, 1.561, 2.108, 5.027, 8.483],
-          "yAxisID": "y1",
-          "borderColor": "#f59e0b",
-          "backgroundColor": "rgba(245, 158, 11, 0.1)",
-          "tension": 0.4,
-          "fill": true
+          "label": "System — Pressure (PSI) · Avg · CPU some",
+          "data": [
+            {
+              "y": 0.849,
+              "yMin": 0.57,
+              "yMax": 0.99
+            },
+            {
+              "y": 7.128,
+              "yMin": 5.04,
+              "yMax": 7.8
+            },
+            {
+              "y": 18.511,
+              "yMin": 12.55,
+              "yMax": 22.23
+            },
+            {
+              "y": 38.888,
+              "yMin": 26.96,
+              "yMax": 47.43
+            },
+            {
+              "y": 62.394,
+              "yMin": 36.8,
+              "yMax": 76.31
+            },
+            {
+              "y": 69.137,
+              "yMin": 23.18,
+              "yMax": 80.8
+            },
+            {
+              "y": 70.308,
+              "yMin": 22.38,
+              "yMax": 83.15
+            }
+          ],
+          "backgroundColor": [
+            "rgba(0,102,204,0.8)",
+            "rgba(230,83,29,0.8)",
+            "rgba(0,153,107,0.8)",
+            "rgba(155,54,183,0.8)",
+            "rgba(204,136,0,0.8)",
+            "rgba(214,39,40,0.8)",
+            "rgba(23,162,184,0.8)"
+          ],
+          "borderColor": [
+            "rgba(0,102,204,1)",
+            "rgba(230,83,29,1)",
+            "rgba(0,153,107,1)",
+            "rgba(155,54,183,1)",
+            "rgba(204,136,0,1)",
+            "rgba(214,39,40,1)",
+            "rgba(23,162,184,1)"
+          ],
+          "borderWidth": 1
         }
       ]
     },
     "options": {
-      "responsive": true,
-      "interaction": {"mode": "index", "intersect": false},
-      "scales": {
-        "y": {
-          "type": "linear",
-          "display": true,
-          "position": "left",
-          "title": {"display": true, "text": "TPS"}
-        },
-        "y1": {
-          "type": "linear",
-          "display": true,
-          "position": "right",
-          "title": {"display": true, "text": "Latency StdDev (ms)"},
-          "grid": {"drawOnChartArea": false}
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "plugins": {
+        "legend": {
+          "display": false
+        }
+      }
+    }
+  },
+  "psi_io_some": {
+    "type": "barWithErrorBars",
+    "data": {
+      "labels": [
+        "c16",
+        "c32",
+        "c64",
+        "c128",
+        "c256",
+        "c512",
+        "c1024"
+      ],
+      "datasets": [
+        {
+          "label": "System — Pressure (PSI) · Avg · IO some",
+          "data": [
+            {
+              "y": 3.392,
+              "yMin": 2.18,
+              "yMax": 4.16
+            },
+            {
+              "y": 4.012,
+              "yMin": 2.54,
+              "yMax": 4.73
+            },
+            {
+              "y": 3.369,
+              "yMin": 2.16,
+              "yMax": 4.28
+            },
+            {
+              "y": 3.257,
+              "yMin": 2.09,
+              "yMax": 4.11
+            },
+            {
+              "y": 3.382,
+              "yMin": 2.57,
+              "yMax": 4.04
+            },
+            {
+              "y": 2.493,
+              "yMin": 1.49,
+              "yMax": 3.31
+            },
+            {
+              "y": 2.704,
+              "yMin": 1.05,
+              "yMax": 4.68
+            }
+          ],
+          "backgroundColor": [
+            "rgba(0,102,204,0.8)",
+            "rgba(230,83,29,0.8)",
+            "rgba(0,153,107,0.8)",
+            "rgba(155,54,183,0.8)",
+            "rgba(204,136,0,0.8)",
+            "rgba(214,39,40,0.8)",
+            "rgba(23,162,184,0.8)"
+          ],
+          "borderColor": [
+            "rgba(0,102,204,1)",
+            "rgba(230,83,29,1)",
+            "rgba(0,153,107,1)",
+            "rgba(155,54,183,1)",
+            "rgba(204,136,0,1)",
+            "rgba(214,39,40,1)",
+            "rgba(23,162,184,1)"
+          ],
+          "borderWidth": 1
+        }
+      ]
+    },
+    "options": {
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "plugins": {
+        "legend": {
+          "display": false
         }
       }
     }

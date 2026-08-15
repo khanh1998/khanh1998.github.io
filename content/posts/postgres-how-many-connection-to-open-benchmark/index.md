@@ -5,411 +5,271 @@ title: 'Postgres: How Many Connections to Open? Benchmark'
 chartjs: true
 math: true
 ---
-## TL;DR
 
-- The optimal number of connections varies per workload and hardware. This benchmark observes how throughput, latency, and wait events change as connection count grows — it does not prescribe a universal number.
-- $\text{core count} \times 2$ is a widely cited starting heuristic from the [PostgreSQL wiki](https://wiki.postgresql.org/wiki/Number_Of_Database_Connections). Use it as a starting point, then tune upward until TPS plateaus and latency variance grows.
+## The question
+I've heard many people said that, in postgres, each connection is a process, so it consume more resource than thread, context switch between processes is also costlier. When there are too many processes, the context switch overhead will cause the performance go down.
 
-## 1. Problem Statement
+Those statements are intuitive. But i want to observe the system from when number of connection small to large.
 
-How many Postgres connections should I open? Should I open as many as possible?
+## The setup
 
-## 2. Quick Background
+### General idea
+The idea is simple. I created two VPSs, one to run pgBench, another to run Postgres, both in the same region to reduce network latency. I created few tables on postgres, then run pgBench to apply some workloads to that tables. Each run I use a different number of connection, from small to large, during the run, I will collect metrics to later comparing.
 
-There is a famous theorem in queueing theory called Little's Law. The formula is:
-$$L=\lambda W$$
-- $L$ is the long-term average number of requests
-- $\lambda$ is the long-term average effective arrival rate
-- $W$ is the average time that a request spends in the system
-
-Assume I design a system that handles at most 1000 QPS (arrival rate), and each query takes 0.05 seconds on average to finish. Applying this theorem, $1000 \times 0.05 = 50$. That means at any second, there will be 50 queries in my database. Each query needs a connection, so I should open at least 50 connections; otherwise, queries will queue for a connection.
-
-But that's the number of connections I need, not the number of connections I can open on a Postgres instance.
-
-In Postgres, there is a config named `max_connections` that defines the maximum number of connections you can create. The default is 100, but it also varies by platform and instance size.
-
-So if the maximum number of connections I can open on a Postgres instance is typically larger than what I need, why not just open all the connections I need, or even the maximum number of connections?
-
-In Postgres, one client connection maps to one backend process. The more connections we open, the more context switching happens, and process context switching is much more expensive than thread switching. More backend processes can improve concurrency up to a point. Too many processes increase context switching and can hurt throughput and latency. Each connection only takes a few MB of RAM; the real cost is process context switching, which can cause CPU thrashing.
-
-To reduce context switching, we need to take CPU count into account:
-$$\text{connections} = (\text{core count} \times 2) + \text{effective spindle count}$$
-- $\text{core count}$ should not include HT threads, even if hyperthreading is enabled
-- $\text{effective spindle count}$ (the number of physical rotating disk spindles; zero when data is fully cached in memory) is zero if the active data set is fully cached, and approaches the actual number of spindles as the cache hit rate falls.
-
-Reference: [Number Of Database Connections](https://wiki.postgresql.org/wiki/Number_Of_Database_Connections)
-
-In this benchmark, I start with two connections (equal to the number of vCPUs) and keep increasing until TPS plateaus.
-
-## 3. Benchmark Goal and Scope
-
-### Goal
-
-Observe how TPS, latency, and wait events change as connection count increases on this specific workload and hardware. The goal is not to find a universal optimal connection count — that depends on your workload, hardware, and access patterns — but to understand how Postgres behaves as concurrency grows.
-
-### In Scope
-
-- Connection count tuning for this specific workload.
-- Database and OS observations.
-
-### Out of Scope
-
-- Other hardware classes.
-- Other database engines.
-- Full cost/performance analysis.
-
-## 4. Environment
-
-- Postgres version: 18
-- Load generator: pgbench on EC2 `t3.micro` 2 vCPU, 1GB RAM
-- Database: RDS `db.t4g.micro` 2 vCPU, 1GB RAM, 20GB storage, 90MB shared buffer
-- Region/AZ: ap-southeast-2
-
-## 5. Workload Design (E-wallet)
-
-### Tables
-
-- `users(id, name)`
-- `wallets(id, user_id, balance, updated_at)`
-- `transactions(id, idempotency_key, amount, status, created_at)`
-- `ledger_entries(id, transaction_id, wallet_id, amount, direction, created_at)`
-
-### Operation Mix
-
-1. Transfer between two random users (weight 60%)
-2. Get balance of a random user (weight 25%)
-3. Get history of a random user (weight 15%)
-
-Each script file is assigned a weight (sum = 100%), which determines the probability that it will be executed. A higher weight means a higher chance of execution.
-
-These operations are performed against random users rather than following a Zipf distribution. In this benchmark, I want to focus on how Postgres behaves when the connection count changes, not on simulating a real e-wallet workload.
-
-## 6. Dataset and Seeding
-
-### Seeded Data Size
-
-| Table Name | Table Size | Indexes Size | Total Size |
-|------------|-----------|--------------|------------|
-| ledger_entries | 15 MB | 10040 kB | 24 MB |
-| transactions | 7480 kB | 2208 kB | 9728 kB |
-| wallets | 592 kB | 480 kB | 1104 kB |
-| users | 512 kB | 240 kB | 792 kB |
-
-
-### Data Assumptions
-
-- The seeded data fits in `shared_buffers` (90 MB), resulting in a very high shared buffer hit rate (>> 99%).
-- Seeded data in `transactions` and `ledger_entries` is also random rather than following a distribution like Zipf.
-
-## 7. Methodology
-
-- Tool: pgbench with command: `pgbench -c <conn_count> -j 2 -T 180 --no-vacuum --protocol=prepared --progress=10`
-- Connection counts tested: 2, 4, 8, 16, 32
-- Duration per run: 180 seconds
-- Threads (jobs): 2
-- Warm-up time: 0 seconds (connection setup time is < 1 second)
-- Repetitions per config: 1
-- Mode: Prepared statements, no VACUUM between runs
-- Metrics collected: TPS, average latency, latency stddev
-- System metrics collected: CPU, load average, DB waits (`pg_stat_activity`), disk, network
-
-During the benchmark, I capture a snapshot of `pg_stat_activity` every 10 seconds. For a 180-second run, this produces about 18 snapshots. I then store those snapshots in a local SQLite collector database for analysis.
-
-The snapshot table (`snap_pg_stat_activity`) is structured with these field groups:
-
-- Run metadata: `_id`, `_run_id`, `_collected_at`, `_phase` (pre, bench, post)
-- Session identity: `pid`, `leader_pid`, `datid`, `datname`, `usesysid`, `usename`, `application_name`
-- Client info: `client_addr`, `client_hostname`, `client_port`
-- Timeline fields: `backend_start`, `xact_start`, `query_start`, `state_change`
-- Wait and state fields: `wait_event_type`, `wait_event`, `state`
-- Transaction/query fields: `backend_xid`, `backend_xmin`, `query_id`, `query`, `backend_type`
-
-Besides `pg_stat_activity`, I also collect system metrics (CPU, disk, and network) at the same 10-second interval.
-
-### Wait Profile Analysis
-
-Wait events are aggregated with this query against the collector database:
-
+### Table setup
 ```sql
-SELECT
-  COALESCE(wait_event_type, 'CPU') AS wait_event_type,
-  COALESCE(wait_event, 'running')  AS wait_event,
-  COUNT(*)                          AS occurrences,
-  COUNT(DISTINCT _collected_at)     AS snapshot_count
-FROM snap_pg_stat_activity
-WHERE _run_id = ?
-  AND _phase IN (...)     -- phase filter: 'bench', 'pre', 'post'
-  AND state = 'active'
-GROUP BY 1, 2
-ORDER BY 3 DESC
-LIMIT 20
+CREATE TABLE users (
+    id         BIGSERIAL   PRIMARY KEY,
+    name       TEXT        NOT NULL,
+    email      TEXT        UNIQUE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE wallets (
+    id         BIGSERIAL      PRIMARY KEY,
+    user_id    BIGINT         NOT NULL REFERENCES users(id),
+    currency   CHAR(3)        NOT NULL DEFAULT 'USD',
+    balance    NUMERIC(18, 2) NOT NULL DEFAULT 0,
+    status     TEXT           NOT NULL DEFAULT 'active'
+                   CHECK (status IN ('active', 'frozen', 'closed')),
+    updated_at TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ    NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE transactions (
+    id              BIGSERIAL      PRIMARY KEY,
+    idempotency_key UUID           NOT NULL UNIQUE,
+    type            TEXT           NOT NULL
+                        CHECK (type IN ('transfer', 'topup', 'withdrawal')),
+    amount          NUMERIC(18, 2) NOT NULL CHECK (amount > 0),
+    currency        CHAR(3)        NOT NULL,
+    status          TEXT           NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending', 'completed', 'failed', 'reversed')),
+    description     TEXT,
+    created_at      TIMESTAMPTZ    NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE ledger_entries (
+    id             BIGSERIAL      PRIMARY KEY,
+    transaction_id BIGINT         NOT NULL REFERENCES transactions(id),
+    wallet_id      BIGINT         NOT NULL REFERENCES wallets(id),
+    amount         NUMERIC(18, 2) NOT NULL CHECK (amount > 0),
+    direction      TEXT           NOT NULL CHECK (direction IN ('debit', 'credit')),
+    created_at     TIMESTAMPTZ    NOT NULL DEFAULT NOW()
+);
 ```
 
-**Average Active Session (AAS)** is total occurrences across all snapshots divided by the number of snapshots taken:
+### Workload
+Full detail of the sql script can be found at: https://github.com/khanh1998/pg-connection-bench
 
-```js
-const aas = snaps > 0 ? occ / snaps : 0;
+#### Write heavy
+```sql
+\set sender_id   random(1, {{NUM_USERS}})
+\set receiver_id random(1, {{NUM_USERS}})
+\set amount      random(1, 50)
+
+BEGIN;
+
+SELECT id, balance
+FROM wallets
+WHERE id IN (:sender_id, :receiver_id)
+ORDER BY id
+FOR UPDATE;
+
+SELECT floor(balance)::int AS sender_balance
+FROM wallets WHERE id = :sender_id
+\gset
+
+\if :sender_balance < 1
+ROLLBACK;
+\else
+UPDATE wallets SET balance = balance - :amount, updated_at = NOW() WHERE id = :sender_id;
+UPDATE wallets SET balance = balance + :amount, updated_at = NOW() WHERE id = :receiver_id;
+
+INSERT INTO transactions (idempotency_key, type, amount, currency, status)
+VALUES (gen_random_uuid(), 'transfer', :amount, 'USD', 'completed')
+RETURNING id \gset txn_
+
+INSERT INTO ledger_entries (transaction_id, wallet_id, amount, direction)
+VALUES
+    (:txn_id, :sender_id,   :amount::numeric, 'debit'),
+    (:txn_id, :receiver_id, :amount::numeric, 'credit');
+
+COMMIT;
+\endif
 ```
 
-For example: a 180-second run produces 18 snapshots (one every 10 seconds). If `CPU:Running` appears in 10 snapshots with a combined count of 20, AAS = 20 / 10 = 2. AAS can be compared directly to vCPU count as a utilization baseline.
+### Read-Write balance
 
-> **Sampling note:** This samples `pg_stat_activity` every 10 seconds — the same methodology as CloudWatch AAS. Queries completing in milliseconds are rarely captured as `active`, so fast queries are underrepresented. Wait events for long-running or blocked sessions are detected reliably.
 
-### How Noise Was Controlled
+### Collected metrics
 
-- Same instance type and settings for all runs.
-- ANALYZE and CHECKPOINT after seeding
-- These are burstable instances (cloud instance types that accumulate CPU credits during idle periods and spend them during bursts): I only benchmark when there are sufficient CPU and IO credits.
-- For each config, the benchmark runs once, so the result is not fully protected from outliers.
+pgbench: tps, latency, latency stddev
+postgres:- pg_stat_activity, 
+- pg_stat_statements
+os: /proc/vmstat
+kernel: `perf` {cpu-cycles,instructions,ref-cycles,bus-cycles},{uops_issued.any,uops_issued.stall_cycles,uops_retired.slots,uops_retired.stall_cycles},{cycle_activity.stalls_total,cycle_activity.stalls_mem_any,cycle_activity.stalls_l1d_miss,cycle_activity.stalls_l3_miss},{resource_stalls.sb,mem_inst_retired.lock_loads,cache-references,cache-misses},msr/aperf/,msr/mperf/,cpu-clock,task-clock,context-switches,cpu-migrations,major-faults,minor-faults
 
-### RDS Metric Limitations
+### Hardware
+CherryServers
+- pgBench run on VPS: 8 vCPU (Intel Xeon Processor (Icelake)), 31 GB RAM, 200 GB NVMe
+- Postgres run on bare metal: 8 cores 16 threads (Intel Xeon Gold 5315Y @ 3.20GHz), 31 GB RAM, 250 GB NVMe (Raid 1)
 
-Because the database runs on RDS (managed service), deeper OS-level metrics are not accessible:
-- No direct access to kernel context switch counts or CPU scheduler metrics
-- No access to `perf` profiling or flamegraphs
-- No ability to observe page-level memory operations or cache misses
-- Limited to RDS Enhanced Monitoring and Postgres `pg_stat_*` views
+*Postgres was running on bare metal for a stable performance*
+*Both instances was on the same region to reduce network delay*
 
-This means the high `CPU system` usage observed at c16+ is inferred scheduling overhead rather than directly measured context switching. A self-managed instance with `perf` or kernel tracing could provide definitive proof.
+### Software
+pgbench
 
-## 8. Benchmark 1 (Baseline)
+Postgres 18 running with config from PgTune: 
+```
+max_connections = 500
+shared_buffers = 8GB
+effective_cache_size = 24GB
+maintenance_work_mem = 2GB
+checkpoint_completion_target = 0.9
+wal_buffers = 16MB
+default_statistics_target = 100
+random_page_cost = 1.1
+effective_io_concurrency = 1000
+work_mem = 21466kB
+huge_pages = try
+jit = off
+wal_compression = lz4
+autovacuum_work_mem = 2GB
+io_method = io_uring
+min_wal_size = 2GB
+max_wal_size = 8GB
+max_worker_processes = 8
+max_parallel_workers_per_gather = 4
+max_parallel_workers = 8
+max_parallel_maintenance_workers = 4
+```
 
-### Configuration
+## Benchmark scenarios
+The same setup will be executed against these scenarios:
+16, 32, 64, 128, 256, 512 and 1024 connections.
 
-PgBench runs on an EC2 instance and sends queries to RDS. Both are in the same network to ensure low network latency.
+## The observation
 
-### Results
+we gonna going from top to the bottom
 
-#### Data Summary
+### Write heavy workload
+#### pgBench metrics
 
-The benchmark with 2 connections is the baseline. The percentages represent changes compared to the baseline:
+| Metric | c16 | c32 | c64 | c128 | c256 | c512 | c1024 |
+|---|---|---|---|---|---|---|---|
+| TPS | 3085.11 | 6365.24 | 9169.62 | 11808.88 | 13150.34 | 12719.56 | 11967.83 |
+| Avg Latency (ms) | 5.186 | 5.019 | 6.971 | 10.827 | 19.415 | 40.029 | 85.088 |
+| Latency StdDev (ms) | 3.032 | 3.763 | 4.821 | 6.258 | 12.960 | 35.641 | 90.246 |
+| Transactions | 925112 | 1907871 | 2746453 | 3530102 | 3924979 | 3781089 | 3521583 |
 
-| Metric | c2 | c4 | c8 | c16 | c32 | Best |
-|--------|-----|---------|-----------|-----------|-----------|------|
-| TPS | 356.81 | 676.74 <br> +89.7% | 1357.28 <br> +280.4% | 2204.81 <br> +517.9% | 2421.58 <br> +578.7% | ▲ c32 |
-| Avg Latency (ms) | 5.605 | 5.908 <br> +5.4% | 5.891 <br> +5.1% | 7.248 <br> +29.3% | 13.197 <br> +135.5% | ▲ c2 |
-| Latency StdDev (ms) | 9.844 | 5.584 <br> -43.3% | 4.872 <br> -50.5% | 6.402 <br> -35.0% | 13.453 <br> +36.7% | ▲ c8 |
-| Transactions | 64217 | 121777 <br> +89.6% | 244173 <br> +280.2% | 396443 <br> +517.3% | 434833 <br> +577.1% | ▲ c32 |
+{{< chart id="write_heavy_latency" >}}
 
-#### TPS vs Latency Trends
+Latency is increasing in exponentially. The latency growth rate is always increase, from 512 connections, double connection also double latency. That's understandable, maybe because when we double connections (more processes) in next scenario, they queue up for the resource. The latency is made up from the time processing and the time it waiting on the the queue.
 
-{{< chart id="tps_latency" >}}
 
-#### TPS vs Latency StdDev
+{{< chart id="write_heavy_tps" >}}
 
-{{< chart id="tps_stddev" >}}
+TPS drop is increasing until c256, then drop. The growth rate of tps is always drop, from c16 to c32, double connection leads to double in tps, but after that, the growth rate reduce.
+TPS drops and TPS growth rate also drops. It make me think that the resources like CPU has been doing something not useful when we increase the connection.
 
-### Observations
+It make me think so, because, for example, there is a coffee shop with two bartenders, each can make one cup of coffee per minute, together they can make 2 cups per minute. If one people is waiting (no queue) they make 1 cup per minute (50% utilization). If two people request coffee (100% utilization) they make two cup per minute. if four people request (saturation) two people get serve and two people waiting in the queue, but they still making 2 cup per minute. No matter how many people are waiting, they consistently making two cups per minute. If they output drop, that mean the bartenders can't focus on their job and must doing something else like cleaning table.
 
-- From c2 to c16, doubling the connections also doubles TPS while latency stays fairly stable.
-- From c16 to c32, doubling the connections increases TPS by only 10%, but doubles latency.
-- This suggests that the sweet spot lies somewhere between 8 and 16 connections.
+#### Postgres metrics
 
-### System Insights
+##### pg_stat_activity raw wait event count
+let's look at the stat activity to see those processes (connections) waiting on what
 
-**Peak CPU**
-{{< chart id="peak_cpu" >}}
+{{< tabs id="wait_event_count" >}}
 
-CPU contention becomes apparent around 8 connections (`CPU total` = 72.2%). By 16+ connections, CPU is saturated with little headroom.
+---tab Broad view | top_wait_event_count_broad_view---
 
-`CPU user` is database work. It doesn't increase much as connections increase (from 2.3% to 4.6% at peak). Meanwhile, `CPU system` (time spent on OS work — system calls and scheduler overhead) rises from 5.9% to 25.6%, the clearest signal of growing OS-level overhead as more backend processes compete for CPU. `CPU Nice` (time spent running processes at a lowered OS priority) grows the most, from 7.2% to 54.8%; on RDS, Postgres workers or management daemons may run at a non-zero nice value, so this reflects their increasing share of CPU time under load — it is not a direct measure of context switching.
+This broad view groups wait events by type. It is easier to read when the detailed chart has too many series.
 
-**Peak Load Average: 1m (from RDS Enhanced Monitoring)**
+---tab Detail view | top_wait_event_count---
 
-Load average measures how many processes are waiting to use the CPU at any given time — both actively running AND waiting in queue (for CPU or I/O).
-It is not a percentage. It's a raw count.
+cpu:running is not really a wait, it's mean the process is running on cpu, so this is a good thing.
+client:clientread is also not need to care about. it's just that the client is slow or network is slow. the server wait for data from client. it doesn't cost cpu for these wait.
 
-{{< chart id="load_avg" >}}
+The more connection it have, the more lock it is waiting on. the total number of wait seem to double when we double connection
 
-The load at c8 is 1.27 (we have 2 vCPUs), so at peak there are about 1.27 processes running or waiting for CPU. At this point, CPU is still underutilized.
-The load at c16 is 5.55. At this point, we have overloaded the CPU.
-This again suggests that the sweet spot is somewhere between 8 and 16 connections.
+Lwlock:walwrite and lwlock:buffercontent are two most busiest lock. IO:WalSync also show up but without a clear pattern. LWLock:WalInsert shows up mostly at c1024.
 
-## 9. Analysis by Connection Count (Benchmark 1)
+Start from c128 and c256, we started to see: `IPC:ProcarrayGroupUpdate` and `LWLock:ProcArray`. These wait shows that there are overhead of connection managing when we increase the connection.
 
-Wait profiles are derived from the snapshots and AAS metric described in §7 Methodology.
+`lock:transactionid` show a clear pattern, when we double connection, it growth even faster.
 
-### c2 - Baseline
-| Wait Type | Wait Event | Count | AAS |
-|-----------|-----------|-------|-----|
-| CPU | running | 21 | 1.17 |
-| IO | WalSync | 3 | 1.00 |
+minor wait events:
+IO:DataFileExtend and lock:extend appeared rarely.
+lock:tuple
+timeout:vacuumdelay
+timeout:spindelay
 
-The waiting profile looks good.
-- The `CPU` wait is not actually a wait; it indicates processes are running. Our database instance has 2 vCPUs, so a CPU AAS of 1.17 means CPU is underutilized.
-- `IO:WalSync` happens when a transaction waits for WAL buffer data to be physically flushed and acknowledged by disk.
+{{< /tabs >}}
 
-### c4 - Low Concurrency
-| Wait Type | Wait Event | Count | AAS |
-|-----------|-----------|-------|-----|
-| CPU | running | 24 | 1.33 |
-| IO | WalSync | 2 | 1.00 |
 
-Still fine. CPU is still underutilized.
 
-### c8 - Moderate Concurrency
-| Wait Type | Wait Event | Count | AAS |
-|-----------|-----------|-------|-----|
-| CPU | running | 24 | 1.33 |
-| IO | WalSync | 13 | 1.00 |
-| LWLock | WALWrite | 11 | 1.57 |
-| Client | ClientRead | 1 | 1.00 |
+##### pg_stat_activity wait event percents
 
-Still fine.
-- But notice there is a small amount of `Client:ClientRead` wait. This usually happens in an interactive multi-query transaction, where the server finishes processing the current query and waits for the next query from the client. This wait indicates network latency between the client and Postgres, or that the client can't keep up with Postgres.
-- Postgres has a WAL buffer (`wal_buffers`) to batch many transaction commits together and perform one fsync (a system call that flushes dirty OS page cache data to durable storage). When a transaction commits, it needs to acquire a lightweight lock on this WAL buffer so it can write. `LWLock:WALWrite` indicates that many transactions are concurrently trying to write commit records to the WAL buffer.
-- At this point, we are still underutilized.
+{{< tabs id="wait_event_percent" >}}
+---tab Broad view | top_wait_event_percent_broad_view---
+- the cpu percent is reducing. That mean the more connections we add in, most of them result in waiting, only small portion are actually running.
+- the io percent is also drop.
 
+all other wait type show a increasing trend. that mean, the more connection we all, large portion of them are endup waiting for those locks.
 
-### c16 - High Concurrency
-| Wait Type | Wait Event | Count | AAS |
-|-----------|-----------|-------|-----|
-| LWLock | WALWrite | 27 | 2.08 |
-| CPU | running | 22 | 1.22 |
-| IO | WalSync | 14 | 1.00 |
-| Client | ClientRead | 8 | 1.00 |
-| Lock | transactionid | 2 | 1.00 |
-| IO | WalWrite | 1 | 1.00 |
+---tab Detail view | top_wait_event_percent---
+- Two dominant wait events are: LWLock:WalWrite and LWLock:BufferContent
+{{< /tabs >}}
 
-- AAS of `LWLock:WALWrite` is 2.08, higher than our vCPU count. This is unhealthy: it indicates that `LWLock:WALWrite` is overloaded, so adding more connections probably won't help.
-- After a transaction writes to the WAL buffer successfully, it calls `write()` to copy WAL data to the OS page cache (the kernel's in-memory buffer for disk writes). `IO:WalWrite` is waiting for that `write()` call to return.
 
-### c32 - Saturation Point
-| Wait Type | Wait Event | Count | AAS |
-|-----------|-----------|-------|-----|
-| Client | ClientRead | 45 | 4.09 |
-| CPU | running | 37 | 2.06 |
-| LWLock | WALWrite | 25 | 2.78 |
-| IO | WalSync | 12 | 1.00 |
-| Lock | transactionid | 2 | 1.00 |
-| LWLock | BufferContent | 1 | 1.00 |
-| LWLock | WALInsert | 1 | 1.00 |
+#### pg_stat_statement
 
-- AAS of `Client:ClientRead` is very high, around double our vCPU count. The client can't keep up with the server.
-- `CPU:running` reaches the limit at `2.06`.
-- `LWLock:WALWrite` is now worse than in the previous run.
-- For `LWLock:WALInsert`, before a transaction can copy data into the WAL buffer, it must reserve a byte range protected by the WALInsert lock. Postgres has 8 of these locks by default, and each lock is held for a very short period. So if we observe this wait, more than 8 transactions are trying to acquire these locks, which indicates extreme write concurrency.
+**LWLock:BufferContent**
 
-**Summarize of WAL lock**
+| Query | c16 | c32 | c64 | c128 | c256 | c512 | c1024 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SELECT floor(balance)::int AS sender_balance<br>FROM wallets WHERE id = ? | — | — | — | — | — | — | 33.3% (47.12s) |
+| SELECT id, balance<br>FROM wallets<br>WHERE id IN (? /*, ... */)<br>ORDER BY id<br>FOR UPDATE | — | — | — | — | 3.4% (26.12s) | — | 13.8% (1925.95s) |
+| UPDATE wallets SET balance = balance - ?, updated_at = NOW() WHERE id = ? | — | — | — | — | — | 14.3% (57.83s) | 15.5% (142.65s) |
+| INSERT INTO transactions (idempotency_key, type, amount, currency, status)<br>VALUES (gen_random_uuid(), ?, ?, ?, ?)<br>RETURNING id | — | — | — | 24.0% (191.50s) | 70.2% (1953.49s) | 85.7% (10433.48s) | 87.8% (41287.90s) |
+| INSERT INTO ledger_entries (transaction_id, wallet_id, amount, direction)<br>VALUES<br>    (?, ?,   ?::numeric, ?),<br>    (?, ?, ?::numeric, ?) | — | 14.3% (68.47s) | 46.7% (457.26s) | 47.8% (1235.08s) | 85.6% (10810.96s) | 92.6% (43995.31s) | 89.5% (107084.30s) |
+| UPDATE wallets SET balance = balance + ?, updated_at = NOW() WHERE id = ? | — | — | — | — | — | 18.2% (67.93s) | 55.3% (463.03s) |
 
-![WAL Insert, WAL Write, WAL Sync explain](image-1.png)
 
-## 10. Benchmark 2 (Pipeline Mode)
-From Benchmark 1, at 32 connections the `ClientRead` wait is very high — the client is too slow, making transactions take longer to finish.
+**LWLock:WALWrite**
 
-From Little's Law: $L=\lambda W$
-Reducing $W$, the time a query (transaction) spends in the system, allows a higher throughput ($\lambda$) for the same concurrency level ($L$).
+| Query | c16 | c32 | c64 | c128 | c256 | c512 | c1024 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SELECT floor(balance)::int AS sender_balance<br>FROM wallets WHERE id = ? | — | — | — | — | — | 11.1% (8.44s) | 8.3% (11.78s) |
+| SELECT id, balance<br>FROM wallets<br>WHERE id IN (? /*, ... */)<br>ORDER BY id<br>FOR UPDATE | — | — | — | — | — | 3.7% (119.11s) | 0.8% (116.72s) |
+| UPDATE wallets SET balance = balance - ?, updated_at = NOW() WHERE id = ? | — | — | — | — | — | — | 2.8% (25.94s) |
+| INSERT INTO transactions (idempotency_key, type, amount, currency, status)<br>VALUES (gen_random_uuid(), ?, ?, ?, ?)<br>RETURNING id | — | — | — | — | 1.0% (26.76s) | 4.9% (597.51s) | 2.8% (1318.48s) |
+| INSERT INTO ledger_entries (transaction_id, wallet_id, amount, direction)<br>VALUES<br>    (?, ?,   ?::numeric, ?),<br>    (?, ?, ?::numeric, ?) | — | — | — | 2.2% (56.14s) | 3.5% (436.81s) | 3.1% (1475.25s) | 4.6% (5552.00s) |
+| UPDATE wallets SET balance = balance + ?, updated_at = NOW() WHERE id = ? | — | — | — | — | 20.0% (49.09s) | 18.2% (67.93s) | 2.1% (17.81s) |
 
-So I decided to use pipeline mode to remove this wait almost entirely. Instead of the Postgres server responding to one query and waiting for the next query from the client during a transaction, the client submits all queries in the transaction up front, and the server executes them without waiting between queries.
+Both insert queries spend most of their time waiting on LWLock:BufferContent and LWLock:WALWrite.
 
-### What Changed
-PgBench supports this out of the box. We just need to wrap the transaction with `\startpipeline` and `\endpipeline`.
 
-### Result
-| Metric | c2 | c4 | c8 | c16 | c32 | Best |
-|--------|-----|---------|-----------|-----------|-----------|------|
-| TPS | 1111.25 | 1941.22 <br> +74.7% | 3349.19 <br> +201.4% | 4558.39 <br> +310.2% | 4612.74 <br> +315.1% | ▲ c32 |
-| Avg Latency (ms) | 1.799 | 2.059 <br> +14.5% | 2.383 <br> +32.5% | 3.502 <br> +94.7% | 6.920 <br> +284.7% | ▲ c2 |
-| Latency StdDev (ms) | 1.086 | 1.561 <br> +43.7% | 2.108 <br> +94.1% | 5.027 <br> +362.9% | 8.483 <br> +681.1% | ▲ c2 |
-| Transactions | 199997 | 349321 <br> +74.7% | 602441 <br> +201.2% | 819367 <br> +309.7% | 828214 <br> +314.1% | ▲ c32 |
 
+After pg_stat_activity and pg_stat_statements, we can see that when we increase more connection, most of connection time now are waiting for. These waiting in theory should cost very little CPU, but how is it behave under high load? let's see some lower level metrics
 
-TPS is roughly double compared to not using pipeline mode.
+#### OS Metrics
 
-{{< chart id="tps_latency_pipeline" >}}
+**PSI**
+{{< tabs id="pressure_stall_information" >}}
 
-{{< chart id="tps_stddev_pipeline" >}}
+---tab Broad view | psi_cpu_some---
 
-- From c16 to c32, doubling connections results in little TPS increase, while latency and latency stddev become very high. This means the system takes longer to process queries and response time is less stable.
-- From c8 to c16, increasing connections does increase TPS, but we trade off higher latency and less stable response time.
+huge pressure on cpu (no pressure on mem at all)
 
-**Peak CPU**
+---tab Detail view | psi_io_some---
 
-{{< chart id="peak_cpu_pipeline" >}}
+{{< /tabs >}}
 
-- CPU is saturated around c8 (`CPU total` = 79%).
+relative low
 
-**Pipeline Load Average: 1m**
 
-{{< chart id="load_avg_pipeline" >}}
-
-From this chart, the load is 3.04 at c8, meaning there are about 3 processes running or waiting for CPU. We only have 2 vCPUs, suggesting that CPU is saturated at c8.
-
-**Average Active Session**
-### c4
-
-| Wait Type | Wait Event | Count | AAS |
-|-----------|------------|-------|-----|
-| CPU | running | 27 | 1.50 |
-| IO | WalSync | 15 | 1.00 |
-| LWLock | WALWrite | 11 | 1.38 |
-
-Everything looks healthy here, all AAS < 2 vCPU
-
-### c8
-
-| Wait Type | Wait Event | Count | AAS |
-|-----------|------------|-------|-----|
-| LWLock | WALWrite | 39 | 2.60 |
-| CPU | running | 28 | 1.56 |
-| IO | WalSync | 13 | 1.00 |
-| Client | ClientRead | 4 | 2.00 |
-| IO | DataFileRead | 1 | 1.00 |
-
-`LWLock:WALWrite` AAS is 2.60, higher than 2 vCPUs. This suggests that the system is saturated at 8 connections.
-
-### Limitations of Pipeline Mode
-
-- **Error handling complexity.** A query failure mid-pipeline does not automatically abort the rest; client code must handle partial failures explicitly.
-- **Latency figures are not comparable to non-pipeline runs.** Pipeline latency measures the round-trip for the entire batch of queries flushed together, not individual query latency. Comparing latency numbers between §8 and §10 is apples-to-oranges.
-- **Requires explicit client/driver support.** Pipeline mode is a libpq protocol feature. Not all ORMs or drivers expose it — check your driver's documentation before adopting this pattern.
-
-## 11. Side-by-Side Comparison
-
-### Headline Comparison
-
-- Pipeline mode results in almost double TPS compared to normal mode.
-- Pipeline mode saturates with fewer connections.
-
-### Trade-offs
-
-- Higher TPS also means higher latency and latency stddev.
-- We should balance TPS and latency based on the goal.
-
-## 12. Recommendation
-
-### Practical Rule of Thumb
-
-The number of connections should be sized relative to CPU core count. Too many connections do not help.
-
-### How to Tune in Real Systems
-
-1. Start with a conservative connection count: CPU core count * 2.
-2. Increase step by step and re-measure.
-3. Stop when TPS plateaus and latency variance grows.
-4. If your app needs more connections than the current instance can handle, consider a bigger instance with more CPU cores.
-5. Consider pooling (for example, PgBouncer) if needed.
-
-### What to test next
-
-In this benchmark, the dataset fits in `shared_buffers` comfortably. Next, we should benchmark with a working set slightly larger than `shared_buffers`, which should produce more I/O.
-
-## 13. Threats to Validity
-
-- **Single repetition per config.** Each connection count was benchmarked once. A single run is not protected from outliers; results should be treated as directional.
-- **Burstable instances.** Both the load generator (t3.micro) and the database (db.t4g.micro) are burstable instance types. CPU credits were verified sufficient before each run, but residual credit state can still vary between runs and influence results.
-- **RDS metric limitations.** Running on a managed service means no access to kernel-level tools (`perf`, flamegraphs, context switch counters). CPU scheduling observations are inferred from `pg_stat_*` and RDS Enhanced Monitoring, not directly measured.
-- **Dataset fits entirely in shared_buffers.** All seeded data (≈35 MB total) fits within the 90 MB `shared_buffers`, giving a near-100% buffer hit rate. Real workloads with larger datasets will produce a different I/O profile.
-- **Small instance sizes** may magnify scheduling effects relative to production hardware with more CPU cores.
-- **Simplified workload model.** The e-wallet simulation uses uniformly random user selection rather than a realistic skewed distribution. Results are directional, not universal constants.
-
-## 14. Conclusion
-
-- More connections do not always result in more throughput.
-- Longer transactions (more client time inside a transaction) increase connection pressure. Prefer shortening transactions or using a connection pooler (e.g., PgBouncer) over simply opening more connections — adding connections beyond CPU capacity causes more harm than good.
-
-## Appendix
-
-### Scripts
-
-All SQL scripts are in [GitHub](https://github.com/khanh1998/pg-connection-bench).
+## The conclusion
+afs

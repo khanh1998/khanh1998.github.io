@@ -1,0 +1,1268 @@
+<!doctype html><html lang=en dir=auto><head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset=utf-8><meta http-equiv=X-UA-Compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,shrink-to-fit=no"><meta name=robots content="index, follow"><title>Postgres Batch Insert Benchmark | Khanh1998</title><meta name=keywords content><meta name=description content='I often hear that batch insert can help to increase the throughput. Instead of insert row by row, we can combine many rows into one batch and insert once. But I want to understand two things:
+
+why is batching help increase insert throughput
+if batching increase the throughput, why don&rsquo;t i just use a very huge batch. Is there a upper limit for a batch size.
+
+Benchmark setup
+Environment
+
+Sysbench running on EC2 t3.micro 2 vCPU, 1GB RAM
+Postgres 18 RDS db.t4g.micro 2 vCPU, 1GB RAM, 20GB storage, 90MB shared buffer
+Both EC2 and RDS are in the same region
+I choose Sysbench over PgBench because it help me to build the batch data from client with Lua script easily
+
+Scripts
+Schema
+
+
+ 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+
+
+
+-- unlogged table for faster seeding
+CREATE UNLOGGED TABLE transactions (
+    id             BIGSERIAL      PRIMARY KEY,
+    account_id     BIGINT         NOT NULL,
+    merchant_id    BIGINT         NOT NULL,
+    amount         NUMERIC(12,2)  NOT NULL,
+    currency       CHAR(3)        NOT NULL DEFAULT &#39;USD&#39;,
+    status         SMALLINT       NOT NULL DEFAULT 0,
+    type           SMALLINT       NOT NULL DEFAULT 0,
+    reference_id   UUID           NOT NULL DEFAULT gen_random_uuid(),
+    description    VARCHAR(255)   NOT NULL,
+    ip_address     INET           NOT NULL,
+    device_id      VARCHAR(64)    NOT NULL,
+    metadata       JSONB          NOT NULL DEFAULT &#39;{}&#39;,
+    created_at     TIMESTAMPTZ    NOT NULL DEFAULT clock_timestamp(),
+    updated_at     TIMESTAMPTZ    NOT NULL DEFAULT clock_timestamp()
+);
+
+-- seeding
+INSERT INTO transactions (
+    account_id, merchant_id, amount, currency, status, type,
+    reference_id, description, ip_address, device_id, metadata,
+    created_at, updated_at
+)
+SELECT
+    (random() * {{NUM_ACCOUNTS}})::bigint,
+    (random() * {{NUM_MERCHANTS}})::bigint,
+    (random() * 10000)::numeric(12,2),
+    (ARRAY[&#39;USD&#39;,&#39;EUR&#39;,&#39;GBP&#39;,&#39;AUD&#39;,&#39;SGD&#39;])[(random()*4)::int + 1],
+    (random() * 3)::smallint,
+    (random() * 1)::smallint,
+    gen_random_uuid(),
+    &#39;Payment ref-&#39; || g,
+    (&#39;10.&#39; || (random()*255)::int || &#39;.&#39; || (random()*255)::int || &#39;.&#39; || (random()*255)::int)::inet,
+    &#39;device-&#39; || (random() * {{NUM_ACCOUNTS}})::bigint,
+    jsonb_build_object(&#39;channel&#39;, (ARRAY[&#39;web&#39;,&#39;mobile&#39;,&#39;pos&#39;])[(random()*2)::int + 1],
+                       &#39;attempt&#39;, (random()*3)::int + 1),
+    NOW() - (random() * INTERVAL &#39;90 days&#39;),
+    NOW() - (random() * INTERVAL &#39;90 days&#39;)
+FROM generate_series(1, {{NUM_ROWS}}) g;
+
+ALTER TABLE transactions SET LOGGED;
+
+CREATE INDEX ON transactions (account_id);
+CREATE INDEX ON transactions (merchant_id);
+CREATE INDEX ON transactions (account_id, created_at DESC);
+CREATE INDEX ON transactions (status, created_at) WHERE status IN (0, 2);
+CREATE INDEX ON transactions (created_at);
+
+-- update table&#39;s statistic
+VACUUM ANALYZE transactions;
+CHECKPOINT;
+
+-- warm the table
+SELECT COUNT(*) FROM transactions;
+
+
+Sysbench Lua script
+
+
+ 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+
+
+-- batch_insert.lua
+-- Sysbench Lua script for pg batch INSERT benchmark.
+-- Accepts --batch-size=N on the CLI (passed via sysbench_options in mybench).
+-- All row data is generated in the Lua VM (client side) before the query is sent.
+--
+-- Usage (standalone):
+--   sysbench batch_insert.lua \
+--     --pgsql-host=localhost --pgsql-port=5432 \
+--     --pgsql-db=bench --pgsql-user=postgres \
+--     --threads=8 --time=180 --batch-size=100 run
+
+-- ---------------------------------------------------------------------------
+-- Custom CLI options
+-- ---------------------------------------------------------------------------
+sysbench.cmdline.options = {
+    batch_size = {"Number of rows to INSERT per transaction", 1}
+}
+
+-- ---------------------------------------------------------------------------
+-- Per-thread setup / teardown
+-- ---------------------------------------------------------------------------
+local CURRENCIES = {"USD", "EUR", "GBP", "AUD", "SGD"}
+local CHANNELS   = {"web", "mobile", "pos"}
+
+function thread_init()
+    drv = sysbench.sql.driver()
+    con = drv:connect()
+end
+
+function thread_done()
+    con:disconnect()
+end
+
+-- ---------------------------------------------------------------------------
+-- Main benchmark event
+-- Each call = one transaction inserting `batch_size` rows.
+-- The entire VALUES list is built in Lua (client side) before the query fires.
+-- ---------------------------------------------------------------------------
+function event()
+    local batch_size = tonumber(sysbench.opt.batch_size)
+    local values     = {}
+
+    for i = 1, batch_size do
+        local account_id  = sysbench.rand.uniform(1,      100000)
+        local merchant_id = sysbench.rand.uniform(1,       10000)
+        local amount      = math.floor(sysbench.rand.uniform(1, 1000000)) / 100.0   -- 2 decimal places
+        local currency    = CURRENCIES[sysbench.rand.uniform(1, #CURRENCIES)]
+        local status      = sysbench.rand.uniform(0, 3)
+        local txn_type    = sysbench.rand.uniform(0, 1)
+        local channel     = CHANNELS[sysbench.rand.uniform(1, #CHANNELS)]
+        local attempt     = sysbench.rand.uniform(1, 4)
+        local device_id   = "device-" .. sysbench.rand.uniform(1, 100000)
+        local ip          = sysbench.rand.uniform(0, 255) .. "." ..
+                            sysbench.rand.uniform(0, 255) .. "." ..
+                            sysbench.rand.uniform(0, 255) .. "." ..
+                            sysbench.rand.uniform(1, 254)
+
+        -- Escape single quotes in description just in case
+        local description = "Payment ref-" .. sysbench.rand.uniform(1, 1000000)
+
+        values[i] = string.format(
+            -- account_id, merchant_id, amount, currency, status, type,
+            -- reference_id, description, ip_address, device_id, metadata,
+            -- created_at, updated_at
+            "(%d, %d, %.2f, &#39;%s&#39;, %d, %d, gen_random_uuid(), &#39;%s&#39;, &#39;%s&#39;::inet, &#39;%s&#39;, " ..
+            "&#39;{\"channel\":\"%s\",\"attempt\":%d}&#39;::jsonb, clock_timestamp(), clock_timestamp())",
+            account_id, merchant_id, amount, currency, status, txn_type,
+            description, ip, device_id,
+            channel, attempt
+        )
+    end
+
+    local sql = "INSERT INTO transactions " ..
+        "(account_id, merchant_id, amount, currency, status, type, " ..
+        "reference_id, description, ip_address, device_id, metadata, " ..
+        "created_at, updated_at) VALUES " ..
+        table.concat(values, ",")
+
+    con:query("BEGIN")
+    con:query(sql)
+    con:query("COMMIT")
+end
+
+
+Run Parameters
+
+Number of threads: 2. Meaning two sysbench clients will concurrently send requests to RDS
+Duration: 180 seconds
+Batch size: 1, 10, 50, 100, 500, 1000, 2000, 5000, 10000
+Parameter value was used in the seeding file:
+
+
+
+1
+2
+3
+
+
+NUM_ACCOUNTS 100000
+NUM_MERCHANTS 10000
+NUM_ROWS 10000
+
+
+Sample sysbench command:'><meta name=author content="Khanh Bui"><link rel=canonical href=http://localhost:1313/posts/postgres-batch-insert-benchmark/><meta name=google-site-verification content="Siuz-KNzTaGnjWViVxoA0J6xLTJQtxwpsh9L7HHMNnA"><meta name=yandex-verification content="XYZabc"><meta name=msvalidate.01 content="XYZabc"><link crossorigin=anonymous href=/assets/css/stylesheet.7f78bc974773b578ca937265604f38f9683e12cafc55854106b8d508aabd18d5.css integrity="sha256-f3i8l0dztXjKk3JlYE84+Wg+Esr8VYVBBrjVCKq9GNU=" rel="preload stylesheet" as=style><link rel=icon href=http://localhost:1313/favicon.ico><link rel=icon type=image/png sizes=16x16 href=http://localhost:1313/%3Clink%20/%20abs%20url%3E><link rel=icon type=image/png sizes=32x32 href=http://localhost:1313/%3Clink%20/%20abs%20url%3E><link rel=apple-touch-icon href=http://localhost:1313/%3Clink%20/%20abs%20url%3E><link rel=mask-icon href=http://localhost:1313/%3Clink%20/%20abs%20url%3E><meta name=theme-color content="#2e2e33"><meta name=msapplication-TileColor content="#2e2e33"><link rel=alternate hreflang=en href=http://localhost:1313/posts/postgres-batch-insert-benchmark/><noscript><style>#theme-toggle,.top-link{display:none}</style><style>@media(prefers-color-scheme:dark){:root{--theme:rgb(29, 30, 32);--entry:rgb(46, 46, 51);--primary:rgb(218, 218, 219);--secondary:rgb(155, 156, 157);--tertiary:rgb(65, 66, 68);--content:rgb(196, 196, 197);--code-block-bg:rgb(46, 46, 51);--code-bg:rgb(55, 56, 62);--border:rgb(51, 51, 51)}.list{background:var(--theme)}.list:not(.dark)::-webkit-scrollbar-track{background:0 0}.list:not(.dark)::-webkit-scrollbar-thumb{border-color:var(--theme)}}</style></noscript><script src=https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js></script><script src=https://cdn.jsdelivr.net/npm/chartjs-chart-error-bars></script><meta property="og:url" content="http://localhost:1313/posts/postgres-batch-insert-benchmark/"><meta property="og:site_name" content="Khanh1998"><meta property="og:title" content="Postgres Batch Insert Benchmark"><meta property="og:description" content='I often hear that batch insert can help to increase the throughput. Instead of insert row by row, we can combine many rows into one batch and insert once. But I want to understand two things:
+why is batching help increase insert throughput if batching increase the throughput, why don’t i just use a very huge batch. Is there a upper limit for a batch size. Benchmark setup Environment Sysbench running on EC2 t3.micro 2 vCPU, 1GB RAM Postgres 18 RDS db.t4g.micro 2 vCPU, 1GB RAM, 20GB storage, 90MB shared buffer Both EC2 and RDS are in the same region I choose Sysbench over PgBench because it help me to build the batch data from client with Lua script easily Scripts Schema 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 -- unlogged table for faster seeding CREATE UNLOGGED TABLE transactions ( id BIGSERIAL PRIMARY KEY, account_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL, amount NUMERIC(12,2) NOT NULL, currency CHAR(3) NOT NULL DEFAULT &#39;USD&#39;, status SMALLINT NOT NULL DEFAULT 0, type SMALLINT NOT NULL DEFAULT 0, reference_id UUID NOT NULL DEFAULT gen_random_uuid(), description VARCHAR(255) NOT NULL, ip_address INET NOT NULL, device_id VARCHAR(64) NOT NULL, metadata JSONB NOT NULL DEFAULT &#39;{}&#39;, created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp() ); -- seeding INSERT INTO transactions ( account_id, merchant_id, amount, currency, status, type, reference_id, description, ip_address, device_id, metadata, created_at, updated_at ) SELECT (random() * {{NUM_ACCOUNTS}})::bigint, (random() * {{NUM_MERCHANTS}})::bigint, (random() * 10000)::numeric(12,2), (ARRAY[&#39;USD&#39;,&#39;EUR&#39;,&#39;GBP&#39;,&#39;AUD&#39;,&#39;SGD&#39;])[(random()*4)::int + 1], (random() * 3)::smallint, (random() * 1)::smallint, gen_random_uuid(), &#39;Payment ref-&#39; || g, (&#39;10.&#39; || (random()*255)::int || &#39;.&#39; || (random()*255)::int || &#39;.&#39; || (random()*255)::int)::inet, &#39;device-&#39; || (random() * {{NUM_ACCOUNTS}})::bigint, jsonb_build_object(&#39;channel&#39;, (ARRAY[&#39;web&#39;,&#39;mobile&#39;,&#39;pos&#39;])[(random()*2)::int + 1], &#39;attempt&#39;, (random()*3)::int + 1), NOW() - (random() * INTERVAL &#39;90 days&#39;), NOW() - (random() * INTERVAL &#39;90 days&#39;) FROM generate_series(1, {{NUM_ROWS}}) g; ALTER TABLE transactions SET LOGGED; CREATE INDEX ON transactions (account_id); CREATE INDEX ON transactions (merchant_id); CREATE INDEX ON transactions (account_id, created_at DESC); CREATE INDEX ON transactions (status, created_at) WHERE status IN (0, 2); CREATE INDEX ON transactions (created_at); -- update table&#39;s statistic VACUUM ANALYZE transactions; CHECKPOINT; -- warm the table SELECT COUNT(*) FROM transactions; Sysbench Lua script 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 -- batch_insert.lua -- Sysbench Lua script for pg batch INSERT benchmark. -- Accepts --batch-size=N on the CLI (passed via sysbench_options in mybench). -- All row data is generated in the Lua VM (client side) before the query is sent. -- -- Usage (standalone): -- sysbench batch_insert.lua \ -- --pgsql-host=localhost --pgsql-port=5432 \ -- --pgsql-db=bench --pgsql-user=postgres \ -- --threads=8 --time=180 --batch-size=100 run -- --------------------------------------------------------------------------- -- Custom CLI options -- --------------------------------------------------------------------------- sysbench.cmdline.options = { batch_size = {"Number of rows to INSERT per transaction", 1} } -- --------------------------------------------------------------------------- -- Per-thread setup / teardown -- --------------------------------------------------------------------------- local CURRENCIES = {"USD", "EUR", "GBP", "AUD", "SGD"} local CHANNELS = {"web", "mobile", "pos"} function thread_init() drv = sysbench.sql.driver() con = drv:connect() end function thread_done() con:disconnect() end -- --------------------------------------------------------------------------- -- Main benchmark event -- Each call = one transaction inserting `batch_size` rows. -- The entire VALUES list is built in Lua (client side) before the query fires. -- --------------------------------------------------------------------------- function event() local batch_size = tonumber(sysbench.opt.batch_size) local values = {} for i = 1, batch_size do local account_id = sysbench.rand.uniform(1, 100000) local merchant_id = sysbench.rand.uniform(1, 10000) local amount = math.floor(sysbench.rand.uniform(1, 1000000)) / 100.0 -- 2 decimal places local currency = CURRENCIES[sysbench.rand.uniform(1, #CURRENCIES)] local status = sysbench.rand.uniform(0, 3) local txn_type = sysbench.rand.uniform(0, 1) local channel = CHANNELS[sysbench.rand.uniform(1, #CHANNELS)] local attempt = sysbench.rand.uniform(1, 4) local device_id = "device-" .. sysbench.rand.uniform(1, 100000) local ip = sysbench.rand.uniform(0, 255) .. "." .. sysbench.rand.uniform(0, 255) .. "." .. sysbench.rand.uniform(0, 255) .. "." .. sysbench.rand.uniform(1, 254) -- Escape single quotes in description just in case local description = "Payment ref-" .. sysbench.rand.uniform(1, 1000000) values[i] = string.format( -- account_id, merchant_id, amount, currency, status, type, -- reference_id, description, ip_address, device_id, metadata, -- created_at, updated_at "(%d, %d, %.2f, &#39;%s&#39;, %d, %d, gen_random_uuid(), &#39;%s&#39;, &#39;%s&#39;::inet, &#39;%s&#39;, " .. "&#39;{\"channel\":\"%s\",\"attempt\":%d}&#39;::jsonb, clock_timestamp(), clock_timestamp())", account_id, merchant_id, amount, currency, status, txn_type, description, ip, device_id, channel, attempt ) end local sql = "INSERT INTO transactions " .. "(account_id, merchant_id, amount, currency, status, type, " .. "reference_id, description, ip_address, device_id, metadata, " .. "created_at, updated_at) VALUES " .. table.concat(values, ",") con:query("BEGIN") con:query(sql) con:query("COMMIT") end Run Parameters Number of threads: 2. Meaning two sysbench clients will concurrently send requests to RDS Duration: 180 seconds Batch size: 1, 10, 50, 100, 500, 1000, 2000, 5000, 10000 Parameter value was used in the seeding file: 1 2 3 NUM_ACCOUNTS 100000 NUM_MERCHANTS 10000 NUM_ROWS 10000 Sample sysbench command:'><meta property="og:locale" content="en-us"><meta property="og:type" content="article"><meta property="article:section" content="posts"><meta property="article:published_time" content="2026-04-19T11:58:31+07:00"><meta property="article:modified_time" content="2026-04-19T11:58:31+07:00"><meta property="og:image" content="http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E"><meta name=twitter:card content="summary_large_image"><meta name=twitter:image content="http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E"><meta name=twitter:title content="Postgres Batch Insert Benchmark"><meta name=twitter:description content='I often hear that batch insert can help to increase the throughput. Instead of insert row by row, we can combine many rows into one batch and insert once. But I want to understand two things:
+
+why is batching help increase insert throughput
+if batching increase the throughput, why don&rsquo;t i just use a very huge batch. Is there a upper limit for a batch size.
+
+Benchmark setup
+Environment
+
+Sysbench running on EC2 t3.micro 2 vCPU, 1GB RAM
+Postgres 18 RDS db.t4g.micro 2 vCPU, 1GB RAM, 20GB storage, 90MB shared buffer
+Both EC2 and RDS are in the same region
+I choose Sysbench over PgBench because it help me to build the batch data from client with Lua script easily
+
+Scripts
+Schema
+
+
+ 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+
+
+
+-- unlogged table for faster seeding
+CREATE UNLOGGED TABLE transactions (
+    id             BIGSERIAL      PRIMARY KEY,
+    account_id     BIGINT         NOT NULL,
+    merchant_id    BIGINT         NOT NULL,
+    amount         NUMERIC(12,2)  NOT NULL,
+    currency       CHAR(3)        NOT NULL DEFAULT &#39;USD&#39;,
+    status         SMALLINT       NOT NULL DEFAULT 0,
+    type           SMALLINT       NOT NULL DEFAULT 0,
+    reference_id   UUID           NOT NULL DEFAULT gen_random_uuid(),
+    description    VARCHAR(255)   NOT NULL,
+    ip_address     INET           NOT NULL,
+    device_id      VARCHAR(64)    NOT NULL,
+    metadata       JSONB          NOT NULL DEFAULT &#39;{}&#39;,
+    created_at     TIMESTAMPTZ    NOT NULL DEFAULT clock_timestamp(),
+    updated_at     TIMESTAMPTZ    NOT NULL DEFAULT clock_timestamp()
+);
+
+-- seeding
+INSERT INTO transactions (
+    account_id, merchant_id, amount, currency, status, type,
+    reference_id, description, ip_address, device_id, metadata,
+    created_at, updated_at
+)
+SELECT
+    (random() * {{NUM_ACCOUNTS}})::bigint,
+    (random() * {{NUM_MERCHANTS}})::bigint,
+    (random() * 10000)::numeric(12,2),
+    (ARRAY[&#39;USD&#39;,&#39;EUR&#39;,&#39;GBP&#39;,&#39;AUD&#39;,&#39;SGD&#39;])[(random()*4)::int + 1],
+    (random() * 3)::smallint,
+    (random() * 1)::smallint,
+    gen_random_uuid(),
+    &#39;Payment ref-&#39; || g,
+    (&#39;10.&#39; || (random()*255)::int || &#39;.&#39; || (random()*255)::int || &#39;.&#39; || (random()*255)::int)::inet,
+    &#39;device-&#39; || (random() * {{NUM_ACCOUNTS}})::bigint,
+    jsonb_build_object(&#39;channel&#39;, (ARRAY[&#39;web&#39;,&#39;mobile&#39;,&#39;pos&#39;])[(random()*2)::int + 1],
+                       &#39;attempt&#39;, (random()*3)::int + 1),
+    NOW() - (random() * INTERVAL &#39;90 days&#39;),
+    NOW() - (random() * INTERVAL &#39;90 days&#39;)
+FROM generate_series(1, {{NUM_ROWS}}) g;
+
+ALTER TABLE transactions SET LOGGED;
+
+CREATE INDEX ON transactions (account_id);
+CREATE INDEX ON transactions (merchant_id);
+CREATE INDEX ON transactions (account_id, created_at DESC);
+CREATE INDEX ON transactions (status, created_at) WHERE status IN (0, 2);
+CREATE INDEX ON transactions (created_at);
+
+-- update table&#39;s statistic
+VACUUM ANALYZE transactions;
+CHECKPOINT;
+
+-- warm the table
+SELECT COUNT(*) FROM transactions;
+
+
+Sysbench Lua script
+
+
+ 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+
+
+-- batch_insert.lua
+-- Sysbench Lua script for pg batch INSERT benchmark.
+-- Accepts --batch-size=N on the CLI (passed via sysbench_options in mybench).
+-- All row data is generated in the Lua VM (client side) before the query is sent.
+--
+-- Usage (standalone):
+--   sysbench batch_insert.lua \
+--     --pgsql-host=localhost --pgsql-port=5432 \
+--     --pgsql-db=bench --pgsql-user=postgres \
+--     --threads=8 --time=180 --batch-size=100 run
+
+-- ---------------------------------------------------------------------------
+-- Custom CLI options
+-- ---------------------------------------------------------------------------
+sysbench.cmdline.options = {
+    batch_size = {"Number of rows to INSERT per transaction", 1}
+}
+
+-- ---------------------------------------------------------------------------
+-- Per-thread setup / teardown
+-- ---------------------------------------------------------------------------
+local CURRENCIES = {"USD", "EUR", "GBP", "AUD", "SGD"}
+local CHANNELS   = {"web", "mobile", "pos"}
+
+function thread_init()
+    drv = sysbench.sql.driver()
+    con = drv:connect()
+end
+
+function thread_done()
+    con:disconnect()
+end
+
+-- ---------------------------------------------------------------------------
+-- Main benchmark event
+-- Each call = one transaction inserting `batch_size` rows.
+-- The entire VALUES list is built in Lua (client side) before the query fires.
+-- ---------------------------------------------------------------------------
+function event()
+    local batch_size = tonumber(sysbench.opt.batch_size)
+    local values     = {}
+
+    for i = 1, batch_size do
+        local account_id  = sysbench.rand.uniform(1,      100000)
+        local merchant_id = sysbench.rand.uniform(1,       10000)
+        local amount      = math.floor(sysbench.rand.uniform(1, 1000000)) / 100.0   -- 2 decimal places
+        local currency    = CURRENCIES[sysbench.rand.uniform(1, #CURRENCIES)]
+        local status      = sysbench.rand.uniform(0, 3)
+        local txn_type    = sysbench.rand.uniform(0, 1)
+        local channel     = CHANNELS[sysbench.rand.uniform(1, #CHANNELS)]
+        local attempt     = sysbench.rand.uniform(1, 4)
+        local device_id   = "device-" .. sysbench.rand.uniform(1, 100000)
+        local ip          = sysbench.rand.uniform(0, 255) .. "." ..
+                            sysbench.rand.uniform(0, 255) .. "." ..
+                            sysbench.rand.uniform(0, 255) .. "." ..
+                            sysbench.rand.uniform(1, 254)
+
+        -- Escape single quotes in description just in case
+        local description = "Payment ref-" .. sysbench.rand.uniform(1, 1000000)
+
+        values[i] = string.format(
+            -- account_id, merchant_id, amount, currency, status, type,
+            -- reference_id, description, ip_address, device_id, metadata,
+            -- created_at, updated_at
+            "(%d, %d, %.2f, &#39;%s&#39;, %d, %d, gen_random_uuid(), &#39;%s&#39;, &#39;%s&#39;::inet, &#39;%s&#39;, " ..
+            "&#39;{\"channel\":\"%s\",\"attempt\":%d}&#39;::jsonb, clock_timestamp(), clock_timestamp())",
+            account_id, merchant_id, amount, currency, status, txn_type,
+            description, ip, device_id,
+            channel, attempt
+        )
+    end
+
+    local sql = "INSERT INTO transactions " ..
+        "(account_id, merchant_id, amount, currency, status, type, " ..
+        "reference_id, description, ip_address, device_id, metadata, " ..
+        "created_at, updated_at) VALUES " ..
+        table.concat(values, ",")
+
+    con:query("BEGIN")
+    con:query(sql)
+    con:query("COMMIT")
+end
+
+
+Run Parameters
+
+Number of threads: 2. Meaning two sysbench clients will concurrently send requests to RDS
+Duration: 180 seconds
+Batch size: 1, 10, 50, 100, 500, 1000, 2000, 5000, 10000
+Parameter value was used in the seeding file:
+
+
+
+1
+2
+3
+
+
+NUM_ACCOUNTS 100000
+NUM_MERCHANTS 10000
+NUM_ROWS 10000
+
+
+Sample sysbench command:'><script type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Posts","item":"http://localhost:1313/posts/"},{"@type":"ListItem","position":2,"name":"Postgres Batch Insert Benchmark","item":"http://localhost:1313/posts/postgres-batch-insert-benchmark/"}]}</script><script type=application/ld+json>{"@context":"https://schema.org","@type":"BlogPosting","headline":"Postgres Batch Insert Benchmark","name":"Postgres Batch Insert Benchmark","description":"I often hear that batch insert can help to increase the throughput. Instead of insert row by row, we can combine many rows into one batch and insert once. But I want to understand two things:\nwhy is batching help increase insert throughput if batching increase the throughput, why don\u0026rsquo;t i just use a very huge batch. Is there a upper limit for a batch size. Benchmark setup Environment Sysbench running on EC2 t3.micro 2 vCPU, 1GB RAM Postgres 18 RDS db.t4g.micro 2 vCPU, 1GB RAM, 20GB storage, 90MB shared buffer Both EC2 and RDS are in the same region I choose Sysbench over PgBench because it help me to build the batch data from client with Lua script easily Scripts Schema 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 -- unlogged table for faster seeding CREATE UNLOGGED TABLE transactions ( id BIGSERIAL PRIMARY KEY, account_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL, amount NUMERIC(12,2) NOT NULL, currency CHAR(3) NOT NULL DEFAULT \u0026#39;USD\u0026#39;, status SMALLINT NOT NULL DEFAULT 0, type SMALLINT NOT NULL DEFAULT 0, reference_id UUID NOT NULL DEFAULT gen_random_uuid(), description VARCHAR(255) NOT NULL, ip_address INET NOT NULL, device_id VARCHAR(64) NOT NULL, metadata JSONB NOT NULL DEFAULT \u0026#39;{}\u0026#39;, created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp() ); -- seeding INSERT INTO transactions ( account_id, merchant_id, amount, currency, status, type, reference_id, description, ip_address, device_id, metadata, created_at, updated_at ) SELECT (random() * {{NUM_ACCOUNTS}})::bigint, (random() * {{NUM_MERCHANTS}})::bigint, (random() * 10000)::numeric(12,2), (ARRAY[\u0026#39;USD\u0026#39;,\u0026#39;EUR\u0026#39;,\u0026#39;GBP\u0026#39;,\u0026#39;AUD\u0026#39;,\u0026#39;SGD\u0026#39;])[(random()*4)::int + 1], (random() * 3)::smallint, (random() * 1)::smallint, gen_random_uuid(), \u0026#39;Payment ref-\u0026#39; || g, (\u0026#39;10.\u0026#39; || (random()*255)::int || \u0026#39;.\u0026#39; || (random()*255)::int || \u0026#39;.\u0026#39; || (random()*255)::int)::inet, \u0026#39;device-\u0026#39; || (random() * {{NUM_ACCOUNTS}})::bigint, jsonb_build_object(\u0026#39;channel\u0026#39;, (ARRAY[\u0026#39;web\u0026#39;,\u0026#39;mobile\u0026#39;,\u0026#39;pos\u0026#39;])[(random()*2)::int + 1], \u0026#39;attempt\u0026#39;, (random()*3)::int + 1), NOW() - (random() * INTERVAL \u0026#39;90 days\u0026#39;), NOW() - (random() * INTERVAL \u0026#39;90 days\u0026#39;) FROM generate_series(1, {{NUM_ROWS}}) g; ALTER TABLE transactions SET LOGGED; CREATE INDEX ON transactions (account_id); CREATE INDEX ON transactions (merchant_id); CREATE INDEX ON transactions (account_id, created_at DESC); CREATE INDEX ON transactions (status, created_at) WHERE status IN (0, 2); CREATE INDEX ON transactions (created_at); -- update table\u0026#39;s statistic VACUUM ANALYZE transactions; CHECKPOINT; -- warm the table SELECT COUNT(*) FROM transactions; Sysbench Lua script 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 -- batch_insert.lua -- Sysbench Lua script for pg batch INSERT benchmark. -- Accepts --batch-size=N on the CLI (passed via sysbench_options in mybench). -- All row data is generated in the Lua VM (client side) before the query is sent. -- -- Usage (standalone): -- sysbench batch_insert.lua \\ -- --pgsql-host=localhost --pgsql-port=5432 \\ -- --pgsql-db=bench --pgsql-user=postgres \\ -- --threads=8 --time=180 --batch-size=100 run -- --------------------------------------------------------------------------- -- Custom CLI options -- --------------------------------------------------------------------------- sysbench.cmdline.options = { batch_size = {\u0026#34;Number of rows to INSERT per transaction\u0026#34;, 1} } -- --------------------------------------------------------------------------- -- Per-thread setup / teardown -- --------------------------------------------------------------------------- local CURRENCIES = {\u0026#34;USD\u0026#34;, \u0026#34;EUR\u0026#34;, \u0026#34;GBP\u0026#34;, \u0026#34;AUD\u0026#34;, \u0026#34;SGD\u0026#34;} local CHANNELS = {\u0026#34;web\u0026#34;, \u0026#34;mobile\u0026#34;, \u0026#34;pos\u0026#34;} function thread_init() drv = sysbench.sql.driver() con = drv:connect() end function thread_done() con:disconnect() end -- --------------------------------------------------------------------------- -- Main benchmark event -- Each call = one transaction inserting `batch_size` rows. -- The entire VALUES list is built in Lua (client side) before the query fires. -- --------------------------------------------------------------------------- function event() local batch_size = tonumber(sysbench.opt.batch_size) local values = {} for i = 1, batch_size do local account_id = sysbench.rand.uniform(1, 100000) local merchant_id = sysbench.rand.uniform(1, 10000) local amount = math.floor(sysbench.rand.uniform(1, 1000000)) / 100.0 -- 2 decimal places local currency = CURRENCIES[sysbench.rand.uniform(1, #CURRENCIES)] local status = sysbench.rand.uniform(0, 3) local txn_type = sysbench.rand.uniform(0, 1) local channel = CHANNELS[sysbench.rand.uniform(1, #CHANNELS)] local attempt = sysbench.rand.uniform(1, 4) local device_id = \u0026#34;device-\u0026#34; .. sysbench.rand.uniform(1, 100000) local ip = sysbench.rand.uniform(0, 255) .. \u0026#34;.\u0026#34; .. sysbench.rand.uniform(0, 255) .. \u0026#34;.\u0026#34; .. sysbench.rand.uniform(0, 255) .. \u0026#34;.\u0026#34; .. sysbench.rand.uniform(1, 254) -- Escape single quotes in description just in case local description = \u0026#34;Payment ref-\u0026#34; .. sysbench.rand.uniform(1, 1000000) values[i] = string.format( -- account_id, merchant_id, amount, currency, status, type, -- reference_id, description, ip_address, device_id, metadata, -- created_at, updated_at \u0026#34;(%d, %d, %.2f, \u0026#39;%s\u0026#39;, %d, %d, gen_random_uuid(), \u0026#39;%s\u0026#39;, \u0026#39;%s\u0026#39;::inet, \u0026#39;%s\u0026#39;, \u0026#34; .. \u0026#34;\u0026#39;{\\\u0026#34;channel\\\u0026#34;:\\\u0026#34;%s\\\u0026#34;,\\\u0026#34;attempt\\\u0026#34;:%d}\u0026#39;::jsonb, clock_timestamp(), clock_timestamp())\u0026#34;, account_id, merchant_id, amount, currency, status, txn_type, description, ip, device_id, channel, attempt ) end local sql = \u0026#34;INSERT INTO transactions \u0026#34; .. \u0026#34;(account_id, merchant_id, amount, currency, status, type, \u0026#34; .. \u0026#34;reference_id, description, ip_address, device_id, metadata, \u0026#34; .. \u0026#34;created_at, updated_at) VALUES \u0026#34; .. table.concat(values, \u0026#34;,\u0026#34;) con:query(\u0026#34;BEGIN\u0026#34;) con:query(sql) con:query(\u0026#34;COMMIT\u0026#34;) end Run Parameters Number of threads: 2. Meaning two sysbench clients will concurrently send requests to RDS Duration: 180 seconds Batch size: 1, 10, 50, 100, 500, 1000, 2000, 5000, 10000 Parameter value was used in the seeding file: 1 2 3 NUM_ACCOUNTS 100000 NUM_MERCHANTS 10000 NUM_ROWS 10000 Sample sysbench command:\n","keywords":[],"articleBody":"I often hear that batch insert can help to increase the throughput. Instead of insert row by row, we can combine many rows into one batch and insert once. But I want to understand two things:\nwhy is batching help increase insert throughput if batching increase the throughput, why don’t i just use a very huge batch. Is there a upper limit for a batch size. Benchmark setup Environment Sysbench running on EC2 t3.micro 2 vCPU, 1GB RAM Postgres 18 RDS db.t4g.micro 2 vCPU, 1GB RAM, 20GB storage, 90MB shared buffer Both EC2 and RDS are in the same region I choose Sysbench over PgBench because it help me to build the batch data from client with Lua script easily Scripts Schema 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 -- unlogged table for faster seeding CREATE UNLOGGED TABLE transactions ( id BIGSERIAL PRIMARY KEY, account_id BIGINT NOT NULL, merchant_id BIGINT NOT NULL, amount NUMERIC(12,2) NOT NULL, currency CHAR(3) NOT NULL DEFAULT 'USD', status SMALLINT NOT NULL DEFAULT 0, type SMALLINT NOT NULL DEFAULT 0, reference_id UUID NOT NULL DEFAULT gen_random_uuid(), description VARCHAR(255) NOT NULL, ip_address INET NOT NULL, device_id VARCHAR(64) NOT NULL, metadata JSONB NOT NULL DEFAULT '{}', created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp() ); -- seeding INSERT INTO transactions ( account_id, merchant_id, amount, currency, status, type, reference_id, description, ip_address, device_id, metadata, created_at, updated_at ) SELECT (random() * {{NUM_ACCOUNTS}})::bigint, (random() * {{NUM_MERCHANTS}})::bigint, (random() * 10000)::numeric(12,2), (ARRAY['USD','EUR','GBP','AUD','SGD'])[(random()*4)::int + 1], (random() * 3)::smallint, (random() * 1)::smallint, gen_random_uuid(), 'Payment ref-' || g, ('10.' || (random()*255)::int || '.' || (random()*255)::int || '.' || (random()*255)::int)::inet, 'device-' || (random() * {{NUM_ACCOUNTS}})::bigint, jsonb_build_object('channel', (ARRAY['web','mobile','pos'])[(random()*2)::int + 1], 'attempt', (random()*3)::int + 1), NOW() - (random() * INTERVAL '90 days'), NOW() - (random() * INTERVAL '90 days') FROM generate_series(1, {{NUM_ROWS}}) g; ALTER TABLE transactions SET LOGGED; CREATE INDEX ON transactions (account_id); CREATE INDEX ON transactions (merchant_id); CREATE INDEX ON transactions (account_id, created_at DESC); CREATE INDEX ON transactions (status, created_at) WHERE status IN (0, 2); CREATE INDEX ON transactions (created_at); -- update table's statistic VACUUM ANALYZE transactions; CHECKPOINT; -- warm the table SELECT COUNT(*) FROM transactions; Sysbench Lua script 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 -- batch_insert.lua -- Sysbench Lua script for pg batch INSERT benchmark. -- Accepts --batch-size=N on the CLI (passed via sysbench_options in mybench). -- All row data is generated in the Lua VM (client side) before the query is sent. -- -- Usage (standalone): -- sysbench batch_insert.lua \\ -- --pgsql-host=localhost --pgsql-port=5432 \\ -- --pgsql-db=bench --pgsql-user=postgres \\ -- --threads=8 --time=180 --batch-size=100 run -- --------------------------------------------------------------------------- -- Custom CLI options -- --------------------------------------------------------------------------- sysbench.cmdline.options = { batch_size = {\"Number of rows to INSERT per transaction\", 1} } -- --------------------------------------------------------------------------- -- Per-thread setup / teardown -- --------------------------------------------------------------------------- local CURRENCIES = {\"USD\", \"EUR\", \"GBP\", \"AUD\", \"SGD\"} local CHANNELS = {\"web\", \"mobile\", \"pos\"} function thread_init() drv = sysbench.sql.driver() con = drv:connect() end function thread_done() con:disconnect() end -- --------------------------------------------------------------------------- -- Main benchmark event -- Each call = one transaction inserting `batch_size` rows. -- The entire VALUES list is built in Lua (client side) before the query fires. -- --------------------------------------------------------------------------- function event() local batch_size = tonumber(sysbench.opt.batch_size) local values = {} for i = 1, batch_size do local account_id = sysbench.rand.uniform(1, 100000) local merchant_id = sysbench.rand.uniform(1, 10000) local amount = math.floor(sysbench.rand.uniform(1, 1000000)) / 100.0 -- 2 decimal places local currency = CURRENCIES[sysbench.rand.uniform(1, #CURRENCIES)] local status = sysbench.rand.uniform(0, 3) local txn_type = sysbench.rand.uniform(0, 1) local channel = CHANNELS[sysbench.rand.uniform(1, #CHANNELS)] local attempt = sysbench.rand.uniform(1, 4) local device_id = \"device-\" .. sysbench.rand.uniform(1, 100000) local ip = sysbench.rand.uniform(0, 255) .. \".\" .. sysbench.rand.uniform(0, 255) .. \".\" .. sysbench.rand.uniform(0, 255) .. \".\" .. sysbench.rand.uniform(1, 254) -- Escape single quotes in description just in case local description = \"Payment ref-\" .. sysbench.rand.uniform(1, 1000000) values[i] = string.format( -- account_id, merchant_id, amount, currency, status, type, -- reference_id, description, ip_address, device_id, metadata, -- created_at, updated_at \"(%d, %d, %.2f, '%s', %d, %d, gen_random_uuid(), '%s', '%s'::inet, '%s', \" .. \"'{\\\"channel\\\":\\\"%s\\\",\\\"attempt\\\":%d}'::jsonb, clock_timestamp(), clock_timestamp())\", account_id, merchant_id, amount, currency, status, txn_type, description, ip, device_id, channel, attempt ) end local sql = \"INSERT INTO transactions \" .. \"(account_id, merchant_id, amount, currency, status, type, \" .. \"reference_id, description, ip_address, device_id, metadata, \" .. \"created_at, updated_at) VALUES \" .. table.concat(values, \",\") con:query(\"BEGIN\") con:query(sql) con:query(\"COMMIT\") end Run Parameters Number of threads: 2. Meaning two sysbench clients will concurrently send requests to RDS Duration: 180 seconds Batch size: 1, 10, 50, 100, 500, 1000, 2000, 5000, 10000 Parameter value was used in the seeding file: 1 2 3 NUM_ACCOUNTS 100000 NUM_MERCHANTS 10000 NUM_ROWS 10000 Sample sysbench command:\n1 sysbench --db-driver=pgsql --pgsql-host=localhost --pgsql-port=5432 --pgsql-user=postgres --pgsql-password=password --pgsql-db=benchmark --threads=2 --time=180 --batch-size=10000 --report-interval=5 ./benchmark.lua run Methodology Choose a batch size (from small to large) Drop the table if exist. Create the table and seeding some data. Update statistic and request checkpoint. Warm data. Run sysbench benchmark. during the run, collect postgres metrics: pg_stat_activity, pg_stat_statement, pg_stat_tables,…, collect OS metrics: CPU, Disk, Memory,… Drop the table Wait for 30s and to the next benchmark with different batch size All postgres metrics are collect in every 10 seconds and store to a timeseries database for analyze. OS metrics are collect every minute.\nNote: since the EC2 and RDS instances are burstable, I only do benchmark when I got a alot of CPU and IO burstable credit, make sure it’s won’t ever run out during benchmark.\nWeak points:\nAll data are fit on share buffer for each batch size, benchmark is ran once, can suffer from outlier Since we use RDS, OS metrics from Enhance monitoring are not comprehensive max_wal_size of the instance is 2GB, checkpoint_completion_target is 0.9, checkpoint_timeout is 5 minutes . With the benchmark running in 180s, produce at most 2M row, it won’t trigger checkpoint during benchmark. Result Overview Metric batch_1 batch_10 batch_50 batch_100 batch_500 batch_1000 batch_2000 batch_5000 batch_10000 TPS 505.44 412.13 199.02 122.48 23.89 9.00 3.57 1.01 0.28 QPS 1516.31 1236.40 597.06 367.44 71.67 26.99 10.71 3.02 0.84 Avg Latency (ms) 3.95 4.85 10.05 16.33 83.70 222.31 560.33 1982.84 7135.48 p95 Latency (ms) 4.25 5.57 11.24 19.29 164.45 669.89 1903.57 6835.96 22034.77 Transactions 90981 74187 35825 22048 4301 1656 675 185 55 Rows Inserted 90,981 741,870 1,791,250 2,204,800 2,150,500 1,656,000 1,350,000 925,000 550,000 Rows Inserted vs Avg Latency Avg Latency vs p95 Latency As you can see, both throughput (row inserted) and latency perform best at batch 100 for this specific workload and environment. Increase batch size larger than 100 barely help. That mean, for each workload and environment, there is a batch size that work best.\nAverage Active Session (AAS) During the benchmark run, my tool my take a snapshot of pg_stat_activity every 10s and store as a timeseries. In this analysis, we will care about the column wait_event and wait_event_type. Those two can let’s we know what are the transaction are waiting on.\nThe query to compute the AAS table bellow are look like this:\n1 2 3 4 5 6 7 8 9 10 11 12 SELECT COALESCE(wait_event_type, 'CPU') AS wait_event_type, COALESCE(wait_event, 'running') AS wait_event, COUNT(*) AS occurrences, COUNT(DISTINCT _collected_at) AS snapshot_count, COUNT(*)/COUNT(DISTINCT _collected_at) AS aas FROM snap_pg_stat_activity WHERE _run_id = ? AND state = 'active' GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 20 For example, during benchmark 180s, we take a snapshot every 10s, there are 18 snapshots. the wait IO:DataFileRead occurs 2 times in 2 snapshot, it’s AAS is 2/2 = 1.\nWalSync and WalWrite lock explain In this benchmark, we will see WalSync and WalWrite quite often. So I want to introduce about it.\nIn Postgres, there is a Wal buffer (4MB default). During the time data is sync to storage (long), the running transaction will write data to this buffer, and waiting for the next sync. This is a way to batch commits together and called group commit. LWLock:WalWrite and LWLock:WalSync is to protect this buffer. When the transaction commit, it will call\nWait Event Description LWLock:WalInsert Waiting to insert WAL data into a memory buffer. LWLock:WalWrite Waiting for WAL buffers to be written to disk. IO:WalWrite Waiting for a write to a WAL file. IO:WalSync Waiting for a WAL file to reach durable storage. LWLock:WalInsert This is a set of 8 locks protects the in memory WAL ring buffer. When a transaction want to write WAL record to WAL buffer. 8 locks meaning maximum 8 transactions can concurrently insert to wal buffer.\nReserve space in Wal buffer. No lock, CurrBytePos: [atomic fetch-and-add] Copy data to reserved range in wal buffer (need one of 8 locks) IO:WalWrite the write syscall The first transaction (leader) in group commit will write wal buffer to os page cache.\nIO:WalSync the fdatasync syscall The leader in group commit wait for the OS to confirm data has physically reach the storage.\nLWLock:WalWrite The leader in group commit will take responsibility to write data to storage. the followers in group commit will wait on this.\n1 2 3 4 5 6 7 8 9 10 11 All backends (parallel, competing) └── LWLock:WalInsert → write own record to WAL buffer Flush point reached ├── One backend becomes leader │ └── IO:WalWrite → IO:WalSync → signals completion │ └── Everyone else becomes followers └── LWLock:WalWrite (waiting for leader's signal) Leader signals → followers wake up → all proceed to commit Other waits CPU:running This isn’t wait, this mean the backend is running with cpu, not waiting on anything. But it’s not good if this is higher than vCPU. It indicating that the CPU is overload.\nClient:ClientRead Waiting to read data from the client. This mean the client is slow and can’t keep up with the speed of postgres. There can be because of slow network between client and postgres.\nIO:DataFileRead Waiting for a read from a relation data file.\nTimeout:VacuumDelay Waiting in a cost-based vacuum delay point.\nIO:DataFileExtend Waiting for a relation data file to be extended. Tables and indexes in Postgres are files under the hood. When there are no free pages left in the files, postgres must extend the files by writing empty pages to it.\nLock:extend Waiting to extend a relation. only one relation can extend at a time.\nLWLock:BufferContent Waiting to access a data page in memory. Each 8KB pages in shared buffer has a internal latch (light weight lock), transaction when access these page need to acquire this lock.\nIO:WalInitWrite Waiting for a write while initializing a new WAL file.\nbatch_1 Wait Type Wait Event Count Load (AAS/2 vCPU) CPU running 19 1.06 IO WalSync 12 1.00 LWLock WALWrite 1 1.00 From the batch 1, we already see pressure on the WAL because of this write heavy workload.\nbatch_10 Wait Type Wait Event Count Load (AAS/2 vCPU) CPU running 26 1.44 Client ClientRead 7 1.17 IO WalSync 6 1.00 LWLock WALWrite 1 1.00 batch_50 Wait Type Wait Event Count Load (AAS/2 vCPU) CPU running 33 1.74 Client ClientRead 7 1.17 IO WalSync 4 1.00 IO DataFileRead 2 1.00 IO WalInitWrite 1 1.00 LWLock WALWrite 1 1.00 Timeout VacuumDelay 1 1.00 Until batch 50, the postgres is still under utilization AAS \u003c 2 vCPU baseline.\nbatch_100 Wait Type Wait Event Count Load (AAS/2 vCPU) CPU running 40 2.22 Client ClientRead 3 1.00 Lock extend 2 2.00 Timeout VacuumDelay 2 2.00 IO DataFileExtend 1 1.00 IO DataFileRead 1 1.00 LWLock BufferContent 1 1.00 The CPU is overload here.\nbatch_500 Wait Type Wait Event Count Load (AAS/2 vCPU) CPU running 58 3.05 Client ClientRead 2 1.00 Timeout VacuumDelay 1 1.00 batch_1000 Wait Type Wait Event Count Load (AAS/2 vCPU) CPU running 71 3.74 Client ClientRead 1 1.00 LWLock BufferContent 1 1.00 batch_2000 Wait Type Wait Event Count Load (AAS/2 vCPU) CPU running 68 3.58 Client ClientRead 1 1.00 LWLock BufferContent 1 1.00 Timeout VacuumDelay 1 1.00 batch_5000 Wait Type Wait Event Count Load (AAS/2 vCPU) CPU running 65 3.42 Timeout VacuumDelay 3 1.00 LWLock BufferContent 1 1.00 batch_10000 Wait Type Wait Event Count Load (AAS/2 vCPU) CPU running 72 3.60 LWLock BufferContent 2 1.00 Client ClientRead 1 1.00 IO DataFileExtend 1 1.00 OS metrics peak cpu batch_1 19.4% batch_10 25.6% batch_50 42.5% batch_100 48.5% batch_500 51.6% batch_1000 45.7% batch_2000 42.3% batch_5000 41.6% batch_10000 36.3%\nUnnest insert Overview Metric batch_1 batch_10 batch_50 batch_100 batch_500 batch_1000 batch_2000 batch_5000 batch_10000 TPS 473.85 421.61 223.23 118.58 24.46 12.18 6.05 2.24 0.38 QPS 1421.54 1264.82 669.70 355.74 73.39 36.53 18.14 6.72 1.15 Avg Latency (ms) 4.22 4.74 8.96 16.86 81.73 163.95 330.71 891.89 5229.24 p95 Latency (ms) 4.91 5.77 16.12 38.94 383.33 669.89 1235.62 2828.87 21255.35 Transactions 85296 75892 40187 21346 4409 2200 1091 406 78 Rows Inserted 85,296 758,920 2,009,350 2,134,600 2,204,500 2,200,000 2,182,000 2,030,000 780,000 Rows Inserted vs Avg Latency Avg Latency vs p95 Latency CPU IO Write IOPS vs Read IOPS Disk Queue Length vs Await Utilization +1m 0s batch_10000: 98.60 batch_5000: 87.96 batch_2000: 29.97 batch_500: 23.78 batch_1000: 22.32 batch_100: 20.70 batch_50: 14.98 batch_10: 6.67 batch_1: 1.28\nLoad Average: +1m 0s batch_10000: 14.23 batch_5000: 10.28 batch_1000: 3.08 batch_2000: 2.54 batch_500: 2.53 batch_50: 2.26 batch_100: 1.30 batch_10: 1.08 batch_1: 0.67\nComparison Rows Inserted Avg Latency Sysbench Lua script 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 -- batch_insert_unnest.lua -- Sysbench Lua script for pg batch INSERT benchmark using unnest(). -- Instead of a flat VALUES list, builds one array literal per column and uses: -- INSERT … SELECT … FROM unnest(ARRAY[…]::type[], …) AS t(col, …) -- This produces a single, fixed-shape query regardless of batch size, which -- can benefit from plan caching and may reduce per-row parse overhead. -- -- Accepts --batch-size=N on the CLI (passed via sysbench_options in mybench). sysbench.cmdline.options = { batch_size = {\"Number of rows to INSERT per transaction\", 1} } local CURRENCIES = {\"USD\", \"EUR\", \"GBP\", \"AUD\", \"SGD\"} local CHANNELS = {\"web\", \"mobile\", \"pos\"} function thread_init() drv = sysbench.sql.driver() con = drv:connect() end function thread_done() con:disconnect() end function event() local batch_size = tonumber(sysbench.opt.batch_size) -- Per-column arrays (avoids one big table of tuples) local account_ids = {} local merchant_ids = {} local amounts = {} local currencies = {} local statuses = {} local txn_types = {} local descriptions = {} local ip_addresses = {} local device_ids = {} local channels = {} local attempts = {} for i = 1, batch_size do account_ids[i] = sysbench.rand.uniform(1, 100000) merchant_ids[i] = sysbench.rand.uniform(1, 10000) amounts[i] = string.format(\"%.2f\", math.floor(sysbench.rand.uniform(1, 1000000)) / 100.0) currencies[i] = CURRENCIES[sysbench.rand.uniform(1, #CURRENCIES)] statuses[i] = sysbench.rand.uniform(0, 3) txn_types[i] = sysbench.rand.uniform(0, 1) descriptions[i] = \"Payment ref-\" .. sysbench.rand.uniform(1, 1000000) ip_addresses[i] = sysbench.rand.uniform(0, 255) .. \".\" .. sysbench.rand.uniform(0, 255) .. \".\" .. sysbench.rand.uniform(0, 255) .. \".\" .. sysbench.rand.uniform(1, 254) device_ids[i] = \"device-\" .. sysbench.rand.uniform(1, 100000) channels[i] = CHANNELS[sysbench.rand.uniform(1, #CHANNELS)] attempts[i] = sysbench.rand.uniform(1, 4) end -- Build array literals for each column local function int_array(t) return \"ARRAY[\" .. table.concat(t, \",\") .. \"]\" end local function quoted_array(t) local q = {} for i, v in ipairs(t) do q[i] = \"'\" .. v .. \"'\" end return \"ARRAY[\" .. table.concat(q, \",\") .. \"]\" end local function numeric_array(t) return \"ARRAY[\" .. table.concat(t, \",\") .. \"]\" end -- metadata is built from channels + attempts local metadata_arr = {} for i = 1, batch_size do metadata_arr[i] = string.format(\"'{\\\"channel\\\":\\\"%s\\\",\\\"attempt\\\":%d}'\", channels[i], attempts[i]) end local sql = string.format([[ INSERT INTO transactions (account_id, merchant_id, amount, currency, status, type, reference_id, description, ip_address, device_id, metadata, created_at, updated_at) SELECT a, m, n::numeric(12,2), c, s::smallint, tp::smallint, gen_random_uuid(), d, ip::inet, dev, meta::jsonb, clock_timestamp(), clock_timestamp() FROM unnest( %s::bigint[], %s::bigint[], %s::numeric[], %s::text[], %s::int[], %s::int[], %s::text[], %s::text[], %s::text[], %s::jsonb[] ) AS t(a, m, n, c, s, tp, d, ip, dev, meta)]], int_array(account_ids), int_array(merchant_ids), numeric_array(amounts), quoted_array(currencies), int_array(statuses), int_array(txn_types), quoted_array(descriptions), quoted_array(ip_addresses), quoted_array(device_ids), -- jsonb array: elements are already single-quoted objects \"ARRAY[\" .. table.concat(metadata_arr, \",\") .. \"]\" ) con:query(\"BEGIN\") con:query(sql) con:query(\"COMMIT\") end AAS batch_1 Wait Type Wait Event Count Load (AAS/4 vCPU) CPU running 25 1.39 IO WalSync 9 1.00 batch_10 Wait Type Wait Event Count Load (AAS/4 vCPU) CPU running 28 1.56 IO WalSync 9 1.00 LWLock WALWrite 1 1.00 batch_50 Wait Type Wait Event Count Load (AAS/4 vCPU) CPU running 24 1.33 IO DataFileRead 11 1.57 IO WalSync 7 1.00 LWLock WALWrite 3 1.00 Timeout VacuumDelay 3 1.00 Client ClientRead 2 2.00 IO WalInitWrite 2 1.00 IO DataFileWrite 1 1.00 batch_100 Wait Type Wait Event Count Load (AAS/4 vCPU) CPU running 28 1.56 IO DataFileRead 21 1.75 IO WalSync 5 1.00 Timeout VacuumDelay 3 1.00 LWLock WALWrite 2 1.00 batch_500 Wait Type Wait Event Count Load (AAS/4 vCPU) IO DataFileRead 29 1.93 CPU running 23 1.28 Timeout VacuumDelay 6 1.00 Client ClientRead 2 1.00 IO DataFilePrefetch 2 1.00 IO WalSync 1 1.00 batch_1000 Wait Type Wait Event Count Load (AAS/4 vCPU) IO DataFileRead 27 1.80 CPU running 26 1.44 Timeout VacuumDelay 4 1.00 IO WalSync 3 1.00 IO DataFilePrefetch 1 1.00 IO DataFileWrite 1 1.00 batch_2000 Wait Type Wait Event Count Load (AAS/4 vCPU) IO DataFileRead 30 2.00 CPU running 26 1.44 Timeout VacuumDelay 5 1.00 LWLock BufferContent 2 1.00 IO WalSync 1 1.00 batch_5000 Wait Type Wait Event Count Load (AAS/4 vCPU) CPU running 29 1.53 IO DataFileRead 28 2.00 Client ClientRead 2 1.00 IO WalWrite 1 1.00 batch_10000 Wait Type Wait Event Count Load (AAS/4 vCPU) CPU running 78 3.71 Client ClientRead 3 1.00 ","wordCount":"3058","inLanguage":"en","image":"http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E","datePublished":"2026-04-19T11:58:31+07:00","dateModified":"2026-04-19T11:58:31+07:00","author":{"@type":"Person","name":"Khanh Bui"},"mainEntityOfPage":{"@type":"WebPage","@id":"http://localhost:1313/posts/postgres-batch-insert-benchmark/"},"publisher":{"@type":"Organization","name":"Khanh1998","logo":{"@type":"ImageObject","url":"http://localhost:1313/favicon.ico"}}}</script></head><body id=top><script>localStorage.getItem("pref-theme")==="dark"?document.body.classList.add("dark"):localStorage.getItem("pref-theme")==="light"?document.body.classList.remove("dark"):window.matchMedia("(prefers-color-scheme: dark)").matches&&document.body.classList.add("dark")</script><header class=header><nav class=nav><div class=logo><a href=http://localhost:1313/ accesskey=h title="Khanh1998 (Alt + H)"><img src=http://localhost:1313/favicon.ico alt aria-label=logo height=32>Khanh1998</a><div class=logo-switches><button id=theme-toggle accesskey=t title="(Alt + T)" aria-label="Toggle theme">
+<svg id="moon" width="24" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+<svg id="sun" width="24" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button><ul class=lang-switch><li>|</li><li><a href=http://localhost:1313/vi/ title="Tiếng Việt" aria-label="Tiếng Việt">Vi</a></li></ul></div></div><ul id=menu><li><a href=http://localhost:1313/archives/ title=Archive><span>Archive</span></a></li><li><a href=http://localhost:1313/tags/ title=Tags><span>Tags</span></a></li><li><a href=http://localhost:1313/search/ title="Search (Alt + /)" accesskey=/><span>Search</span></a></li></ul></nav></header><main class=main><article class=post-single><header class=post-header><div class=breadcrumbs><a href=http://localhost:1313/>Home</a>&nbsp;»&nbsp;<a href=http://localhost:1313/posts/>Posts</a></div><h1 class="post-title entry-hint-parent">Postgres Batch Insert Benchmark</h1><div class=post-meta><span title='2026-04-19 11:58:31 +0700 +07'>April 19, 2026</span>&nbsp;·&nbsp;15 min&nbsp;·&nbsp;3058 words&nbsp;·&nbsp;Khanh Bui&nbsp;|&nbsp;<a href=https://github.com/khanh1998/khanh1998.github.io/blob/main/content/posts/postgres-batch-insert-benchmark/index.md rel="noopener noreferrer" target=_blank>Suggest Changes</a></div></header><div class=toc><details open><summary accesskey=c title="(Alt + C)"><span class=details>Table of Contents</span></summary><div class=inner><nav id=TableOfContents><ul><li><a href=#benchmark-setup>Benchmark setup</a><ul><li><a href=#environment>Environment</a></li><li><a href=#scripts>Scripts</a></li><li><a href=#run-parameters>Run Parameters</a></li><li><a href=#methodology>Methodology</a></li></ul></li><li><a href=#result>Result</a><ul><li><a href=#overview>Overview</a></li><li><a href=#average-active-session-aas>Average Active Session (AAS)</a></li><li><a href=#os-metrics>OS metrics</a></li></ul></li><li><a href=#unnest-insert>Unnest insert</a><ul><li><a href=#overview-1>Overview</a></li><li><a href=#load-average>Load Average:</a></li></ul></li><li><a href=#comparison>Comparison</a><ul><li><a href=#rows-inserted>Rows Inserted</a></li><li><a href=#avg-latency>Avg Latency</a></li><li><a href=#sysbench-lua-script-1>Sysbench Lua script</a></li><li><a href=#aas>AAS</a></li></ul></li></ul></nav></div></details></div><div class=post-content><p>I often hear that batch insert can help to increase the throughput. Instead of insert row by row, we can combine many rows into one batch and insert once. But I want to understand two things:</p><ol><li>why is batching help increase insert throughput</li><li>if batching increase the throughput, why don&rsquo;t i just use a very huge batch. Is there a upper limit for a batch size.</li></ol><h2 id=benchmark-setup>Benchmark setup<a hidden class=anchor aria-hidden=true href=#benchmark-setup>#</a></h2><h3 id=environment>Environment<a hidden class=anchor aria-hidden=true href=#environment>#</a></h3><ul><li>Sysbench running on EC2 <code>t3.micro</code> 2 vCPU, 1GB RAM</li><li>Postgres 18 RDS <code>db.t4g.micro</code> 2 vCPU, 1GB RAM, 20GB storage, 90MB shared buffer</li><li>Both EC2 and RDS are in the same region</li><li>I choose Sysbench over PgBench because it help me to build the batch data from client with Lua script easily</li></ul><h3 id=scripts>Scripts<a hidden class=anchor aria-hidden=true href=#scripts>#</a></h3><h4 id=schema>Schema<a hidden class=anchor aria-hidden=true href=#schema>#</a></h4><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt id=hl-0-1><a class=lnlinks href=#hl-0-1> 1</a>
+</span><span class=lnt id=hl-0-2><a class=lnlinks href=#hl-0-2> 2</a>
+</span><span class=lnt id=hl-0-3><a class=lnlinks href=#hl-0-3> 3</a>
+</span><span class=lnt id=hl-0-4><a class=lnlinks href=#hl-0-4> 4</a>
+</span><span class=lnt id=hl-0-5><a class=lnlinks href=#hl-0-5> 5</a>
+</span><span class=lnt id=hl-0-6><a class=lnlinks href=#hl-0-6> 6</a>
+</span><span class=lnt id=hl-0-7><a class=lnlinks href=#hl-0-7> 7</a>
+</span><span class=lnt id=hl-0-8><a class=lnlinks href=#hl-0-8> 8</a>
+</span><span class=lnt id=hl-0-9><a class=lnlinks href=#hl-0-9> 9</a>
+</span><span class=lnt id=hl-0-10><a class=lnlinks href=#hl-0-10>10</a>
+</span><span class=lnt id=hl-0-11><a class=lnlinks href=#hl-0-11>11</a>
+</span><span class=lnt id=hl-0-12><a class=lnlinks href=#hl-0-12>12</a>
+</span><span class=lnt id=hl-0-13><a class=lnlinks href=#hl-0-13>13</a>
+</span><span class=lnt id=hl-0-14><a class=lnlinks href=#hl-0-14>14</a>
+</span><span class=lnt id=hl-0-15><a class=lnlinks href=#hl-0-15>15</a>
+</span><span class=lnt id=hl-0-16><a class=lnlinks href=#hl-0-16>16</a>
+</span><span class=lnt id=hl-0-17><a class=lnlinks href=#hl-0-17>17</a>
+</span><span class=lnt id=hl-0-18><a class=lnlinks href=#hl-0-18>18</a>
+</span><span class=lnt id=hl-0-19><a class=lnlinks href=#hl-0-19>19</a>
+</span><span class=lnt id=hl-0-20><a class=lnlinks href=#hl-0-20>20</a>
+</span><span class=lnt id=hl-0-21><a class=lnlinks href=#hl-0-21>21</a>
+</span><span class=lnt id=hl-0-22><a class=lnlinks href=#hl-0-22>22</a>
+</span><span class=lnt id=hl-0-23><a class=lnlinks href=#hl-0-23>23</a>
+</span><span class=lnt id=hl-0-24><a class=lnlinks href=#hl-0-24>24</a>
+</span><span class=lnt id=hl-0-25><a class=lnlinks href=#hl-0-25>25</a>
+</span><span class=lnt id=hl-0-26><a class=lnlinks href=#hl-0-26>26</a>
+</span><span class=lnt id=hl-0-27><a class=lnlinks href=#hl-0-27>27</a>
+</span><span class=lnt id=hl-0-28><a class=lnlinks href=#hl-0-28>28</a>
+</span><span class=lnt id=hl-0-29><a class=lnlinks href=#hl-0-29>29</a>
+</span><span class=lnt id=hl-0-30><a class=lnlinks href=#hl-0-30>30</a>
+</span><span class=lnt id=hl-0-31><a class=lnlinks href=#hl-0-31>31</a>
+</span><span class=lnt id=hl-0-32><a class=lnlinks href=#hl-0-32>32</a>
+</span><span class=lnt id=hl-0-33><a class=lnlinks href=#hl-0-33>33</a>
+</span><span class=lnt id=hl-0-34><a class=lnlinks href=#hl-0-34>34</a>
+</span><span class=lnt id=hl-0-35><a class=lnlinks href=#hl-0-35>35</a>
+</span><span class=lnt id=hl-0-36><a class=lnlinks href=#hl-0-36>36</a>
+</span><span class=lnt id=hl-0-37><a class=lnlinks href=#hl-0-37>37</a>
+</span><span class=lnt id=hl-0-38><a class=lnlinks href=#hl-0-38>38</a>
+</span><span class=lnt id=hl-0-39><a class=lnlinks href=#hl-0-39>39</a>
+</span><span class=lnt id=hl-0-40><a class=lnlinks href=#hl-0-40>40</a>
+</span><span class=lnt id=hl-0-41><a class=lnlinks href=#hl-0-41>41</a>
+</span><span class=lnt id=hl-0-42><a class=lnlinks href=#hl-0-42>42</a>
+</span><span class=lnt id=hl-0-43><a class=lnlinks href=#hl-0-43>43</a>
+</span><span class=lnt id=hl-0-44><a class=lnlinks href=#hl-0-44>44</a>
+</span><span class=lnt id=hl-0-45><a class=lnlinks href=#hl-0-45>45</a>
+</span><span class=lnt id=hl-0-46><a class=lnlinks href=#hl-0-46>46</a>
+</span><span class=lnt id=hl-0-47><a class=lnlinks href=#hl-0-47>47</a>
+</span><span class=lnt id=hl-0-48><a class=lnlinks href=#hl-0-48>48</a>
+</span><span class=lnt id=hl-0-49><a class=lnlinks href=#hl-0-49>49</a>
+</span><span class=lnt id=hl-0-50><a class=lnlinks href=#hl-0-50>50</a>
+</span><span class=lnt id=hl-0-51><a class=lnlinks href=#hl-0-51>51</a>
+</span><span class=lnt id=hl-0-52><a class=lnlinks href=#hl-0-52>52</a>
+</span><span class=lnt id=hl-0-53><a class=lnlinks href=#hl-0-53>53</a>
+</span><span class=lnt id=hl-0-54><a class=lnlinks href=#hl-0-54>54</a>
+</span><span class=lnt id=hl-0-55><a class=lnlinks href=#hl-0-55>55</a>
+</span><span class=lnt id=hl-0-56><a class=lnlinks href=#hl-0-56>56</a>
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-sql data-lang=sql><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=c1>-- unlogged table for faster seeding
+</span></span></span><span class=line><span class=cl><span class=k>CREATE</span><span class=w> </span><span class=n>UNLOGGED</span><span class=w> </span><span class=k>TABLE</span><span class=w> </span><span class=n>transactions</span><span class=w> </span><span class=p>(</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>id</span><span class=w>             </span><span class=n>BIGSERIAL</span><span class=w>      </span><span class=k>PRIMARY</span><span class=w> </span><span class=k>KEY</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>account_id</span><span class=w>     </span><span class=nb>BIGINT</span><span class=w>         </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>merchant_id</span><span class=w>    </span><span class=nb>BIGINT</span><span class=w>         </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>amount</span><span class=w>         </span><span class=nb>NUMERIC</span><span class=p>(</span><span class=mi>12</span><span class=p>,</span><span class=mi>2</span><span class=p>)</span><span class=w>  </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>currency</span><span class=w>       </span><span class=nb>CHAR</span><span class=p>(</span><span class=mi>3</span><span class=p>)</span><span class=w>        </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=w> </span><span class=k>DEFAULT</span><span class=w> </span><span class=s1>&#39;USD&#39;</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>status</span><span class=w>         </span><span class=nb>SMALLINT</span><span class=w>       </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=w> </span><span class=k>DEFAULT</span><span class=w> </span><span class=mi>0</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=k>type</span><span class=w>           </span><span class=nb>SMALLINT</span><span class=w>       </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=w> </span><span class=k>DEFAULT</span><span class=w> </span><span class=mi>0</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>reference_id</span><span class=w>   </span><span class=n>UUID</span><span class=w>           </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=w> </span><span class=k>DEFAULT</span><span class=w> </span><span class=n>gen_random_uuid</span><span class=p>(),</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>description</span><span class=w>    </span><span class=nb>VARCHAR</span><span class=p>(</span><span class=mi>255</span><span class=p>)</span><span class=w>   </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>ip_address</span><span class=w>     </span><span class=n>INET</span><span class=w>           </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>device_id</span><span class=w>      </span><span class=nb>VARCHAR</span><span class=p>(</span><span class=mi>64</span><span class=p>)</span><span class=w>    </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>metadata</span><span class=w>       </span><span class=n>JSONB</span><span class=w>          </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=w> </span><span class=k>DEFAULT</span><span class=w> </span><span class=s1>&#39;{}&#39;</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>created_at</span><span class=w>     </span><span class=n>TIMESTAMPTZ</span><span class=w>    </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=w> </span><span class=k>DEFAULT</span><span class=w> </span><span class=n>clock_timestamp</span><span class=p>(),</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>updated_at</span><span class=w>     </span><span class=n>TIMESTAMPTZ</span><span class=w>    </span><span class=k>NOT</span><span class=w> </span><span class=k>NULL</span><span class=w> </span><span class=k>DEFAULT</span><span class=w> </span><span class=n>clock_timestamp</span><span class=p>()</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=p>);</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=c1>-- seeding
+</span></span></span><span class=line><span class=cl><span class=k>INSERT</span><span class=w> </span><span class=k>INTO</span><span class=w> </span><span class=n>transactions</span><span class=w> </span><span class=p>(</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>account_id</span><span class=p>,</span><span class=w> </span><span class=n>merchant_id</span><span class=p>,</span><span class=w> </span><span class=n>amount</span><span class=p>,</span><span class=w> </span><span class=n>currency</span><span class=p>,</span><span class=w> </span><span class=n>status</span><span class=p>,</span><span class=w> </span><span class=k>type</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>reference_id</span><span class=p>,</span><span class=w> </span><span class=n>description</span><span class=p>,</span><span class=w> </span><span class=n>ip_address</span><span class=p>,</span><span class=w> </span><span class=n>device_id</span><span class=p>,</span><span class=w> </span><span class=n>metadata</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>created_at</span><span class=p>,</span><span class=w> </span><span class=n>updated_at</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=p>)</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>SELECT</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=err>{{</span><span class=n>NUM_ACCOUNTS</span><span class=err>}}</span><span class=p>)::</span><span class=nb>bigint</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=err>{{</span><span class=n>NUM_MERCHANTS</span><span class=err>}}</span><span class=p>)::</span><span class=nb>bigint</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=mi>10000</span><span class=p>)::</span><span class=nb>numeric</span><span class=p>(</span><span class=mi>12</span><span class=p>,</span><span class=mi>2</span><span class=p>),</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=p>(</span><span class=nb>ARRAY</span><span class=p>[</span><span class=s1>&#39;USD&#39;</span><span class=p>,</span><span class=s1>&#39;EUR&#39;</span><span class=p>,</span><span class=s1>&#39;GBP&#39;</span><span class=p>,</span><span class=s1>&#39;AUD&#39;</span><span class=p>,</span><span class=s1>&#39;SGD&#39;</span><span class=p>])[(</span><span class=n>random</span><span class=p>()</span><span class=o>*</span><span class=mi>4</span><span class=p>)::</span><span class=nb>int</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=mi>1</span><span class=p>],</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=mi>3</span><span class=p>)::</span><span class=nb>smallint</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=mi>1</span><span class=p>)::</span><span class=nb>smallint</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>gen_random_uuid</span><span class=p>(),</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=s1>&#39;Payment ref-&#39;</span><span class=w> </span><span class=o>||</span><span class=w> </span><span class=k>g</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=p>(</span><span class=s1>&#39;10.&#39;</span><span class=w> </span><span class=o>||</span><span class=w> </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=o>*</span><span class=mi>255</span><span class=p>)::</span><span class=nb>int</span><span class=w> </span><span class=o>||</span><span class=w> </span><span class=s1>&#39;.&#39;</span><span class=w> </span><span class=o>||</span><span class=w> </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=o>*</span><span class=mi>255</span><span class=p>)::</span><span class=nb>int</span><span class=w> </span><span class=o>||</span><span class=w> </span><span class=s1>&#39;.&#39;</span><span class=w> </span><span class=o>||</span><span class=w> </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=o>*</span><span class=mi>255</span><span class=p>)::</span><span class=nb>int</span><span class=p>)::</span><span class=n>inet</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=s1>&#39;device-&#39;</span><span class=w> </span><span class=o>||</span><span class=w> </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=err>{{</span><span class=n>NUM_ACCOUNTS</span><span class=err>}}</span><span class=p>)::</span><span class=nb>bigint</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>jsonb_build_object</span><span class=p>(</span><span class=s1>&#39;channel&#39;</span><span class=p>,</span><span class=w> </span><span class=p>(</span><span class=nb>ARRAY</span><span class=p>[</span><span class=s1>&#39;web&#39;</span><span class=p>,</span><span class=s1>&#39;mobile&#39;</span><span class=p>,</span><span class=s1>&#39;pos&#39;</span><span class=p>])[(</span><span class=n>random</span><span class=p>()</span><span class=o>*</span><span class=mi>2</span><span class=p>)::</span><span class=nb>int</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=mi>1</span><span class=p>],</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>                       </span><span class=s1>&#39;attempt&#39;</span><span class=p>,</span><span class=w> </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=o>*</span><span class=mi>3</span><span class=p>)::</span><span class=nb>int</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=mi>1</span><span class=p>),</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>NOW</span><span class=p>()</span><span class=w> </span><span class=o>-</span><span class=w> </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=nb>INTERVAL</span><span class=w> </span><span class=s1>&#39;90 days&#39;</span><span class=p>),</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span><span class=n>NOW</span><span class=p>()</span><span class=w> </span><span class=o>-</span><span class=w> </span><span class=p>(</span><span class=n>random</span><span class=p>()</span><span class=w> </span><span class=o>*</span><span class=w> </span><span class=nb>INTERVAL</span><span class=w> </span><span class=s1>&#39;90 days&#39;</span><span class=p>)</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>FROM</span><span class=w> </span><span class=n>generate_series</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span><span class=w> </span><span class=err>{{</span><span class=n>NUM_ROWS</span><span class=err>}}</span><span class=p>)</span><span class=w> </span><span class=k>g</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>ALTER</span><span class=w> </span><span class=k>TABLE</span><span class=w> </span><span class=n>transactions</span><span class=w> </span><span class=k>SET</span><span class=w> </span><span class=n>LOGGED</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>CREATE</span><span class=w> </span><span class=k>INDEX</span><span class=w> </span><span class=k>ON</span><span class=w> </span><span class=n>transactions</span><span class=w> </span><span class=p>(</span><span class=n>account_id</span><span class=p>);</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>CREATE</span><span class=w> </span><span class=k>INDEX</span><span class=w> </span><span class=k>ON</span><span class=w> </span><span class=n>transactions</span><span class=w> </span><span class=p>(</span><span class=n>merchant_id</span><span class=p>);</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>CREATE</span><span class=w> </span><span class=k>INDEX</span><span class=w> </span><span class=k>ON</span><span class=w> </span><span class=n>transactions</span><span class=w> </span><span class=p>(</span><span class=n>account_id</span><span class=p>,</span><span class=w> </span><span class=n>created_at</span><span class=w> </span><span class=k>DESC</span><span class=p>);</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>CREATE</span><span class=w> </span><span class=k>INDEX</span><span class=w> </span><span class=k>ON</span><span class=w> </span><span class=n>transactions</span><span class=w> </span><span class=p>(</span><span class=n>status</span><span class=p>,</span><span class=w> </span><span class=n>created_at</span><span class=p>)</span><span class=w> </span><span class=k>WHERE</span><span class=w> </span><span class=n>status</span><span class=w> </span><span class=k>IN</span><span class=w> </span><span class=p>(</span><span class=mi>0</span><span class=p>,</span><span class=w> </span><span class=mi>2</span><span class=p>);</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>CREATE</span><span class=w> </span><span class=k>INDEX</span><span class=w> </span><span class=k>ON</span><span class=w> </span><span class=n>transactions</span><span class=w> </span><span class=p>(</span><span class=n>created_at</span><span class=p>);</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=c1>-- update table&#39;s statistic
+</span></span></span><span class=line><span class=cl><span class=k>VACUUM</span><span class=w> </span><span class=k>ANALYZE</span><span class=w> </span><span class=n>transactions</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>CHECKPOINT</span><span class=p>;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>
+</span></span></span><span class=line><span class=cl><span class=c1>-- warm the table
+</span></span></span><span class=line><span class=cl><span class=k>SELECT</span><span class=w> </span><span class=k>COUNT</span><span class=p>(</span><span class=o>*</span><span class=p>)</span><span class=w> </span><span class=k>FROM</span><span class=w> </span><span class=n>transactions</span><span class=p>;</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><h4 id=sysbench-lua-script>Sysbench Lua script<a hidden class=anchor aria-hidden=true href=#sysbench-lua-script>#</a></h4><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt id=hl-1-1><a class=lnlinks href=#hl-1-1> 1</a>
+</span><span class=lnt id=hl-1-2><a class=lnlinks href=#hl-1-2> 2</a>
+</span><span class=lnt id=hl-1-3><a class=lnlinks href=#hl-1-3> 3</a>
+</span><span class=lnt id=hl-1-4><a class=lnlinks href=#hl-1-4> 4</a>
+</span><span class=lnt id=hl-1-5><a class=lnlinks href=#hl-1-5> 5</a>
+</span><span class=lnt id=hl-1-6><a class=lnlinks href=#hl-1-6> 6</a>
+</span><span class=lnt id=hl-1-7><a class=lnlinks href=#hl-1-7> 7</a>
+</span><span class=lnt id=hl-1-8><a class=lnlinks href=#hl-1-8> 8</a>
+</span><span class=lnt id=hl-1-9><a class=lnlinks href=#hl-1-9> 9</a>
+</span><span class=lnt id=hl-1-10><a class=lnlinks href=#hl-1-10>10</a>
+</span><span class=lnt id=hl-1-11><a class=lnlinks href=#hl-1-11>11</a>
+</span><span class=lnt id=hl-1-12><a class=lnlinks href=#hl-1-12>12</a>
+</span><span class=lnt id=hl-1-13><a class=lnlinks href=#hl-1-13>13</a>
+</span><span class=lnt id=hl-1-14><a class=lnlinks href=#hl-1-14>14</a>
+</span><span class=lnt id=hl-1-15><a class=lnlinks href=#hl-1-15>15</a>
+</span><span class=lnt id=hl-1-16><a class=lnlinks href=#hl-1-16>16</a>
+</span><span class=lnt id=hl-1-17><a class=lnlinks href=#hl-1-17>17</a>
+</span><span class=lnt id=hl-1-18><a class=lnlinks href=#hl-1-18>18</a>
+</span><span class=lnt id=hl-1-19><a class=lnlinks href=#hl-1-19>19</a>
+</span><span class=lnt id=hl-1-20><a class=lnlinks href=#hl-1-20>20</a>
+</span><span class=lnt id=hl-1-21><a class=lnlinks href=#hl-1-21>21</a>
+</span><span class=lnt id=hl-1-22><a class=lnlinks href=#hl-1-22>22</a>
+</span><span class=lnt id=hl-1-23><a class=lnlinks href=#hl-1-23>23</a>
+</span><span class=lnt id=hl-1-24><a class=lnlinks href=#hl-1-24>24</a>
+</span><span class=lnt id=hl-1-25><a class=lnlinks href=#hl-1-25>25</a>
+</span><span class=lnt id=hl-1-26><a class=lnlinks href=#hl-1-26>26</a>
+</span><span class=lnt id=hl-1-27><a class=lnlinks href=#hl-1-27>27</a>
+</span><span class=lnt id=hl-1-28><a class=lnlinks href=#hl-1-28>28</a>
+</span><span class=lnt id=hl-1-29><a class=lnlinks href=#hl-1-29>29</a>
+</span><span class=lnt id=hl-1-30><a class=lnlinks href=#hl-1-30>30</a>
+</span><span class=lnt id=hl-1-31><a class=lnlinks href=#hl-1-31>31</a>
+</span><span class=lnt id=hl-1-32><a class=lnlinks href=#hl-1-32>32</a>
+</span><span class=lnt id=hl-1-33><a class=lnlinks href=#hl-1-33>33</a>
+</span><span class=lnt id=hl-1-34><a class=lnlinks href=#hl-1-34>34</a>
+</span><span class=lnt id=hl-1-35><a class=lnlinks href=#hl-1-35>35</a>
+</span><span class=lnt id=hl-1-36><a class=lnlinks href=#hl-1-36>36</a>
+</span><span class=lnt id=hl-1-37><a class=lnlinks href=#hl-1-37>37</a>
+</span><span class=lnt id=hl-1-38><a class=lnlinks href=#hl-1-38>38</a>
+</span><span class=lnt id=hl-1-39><a class=lnlinks href=#hl-1-39>39</a>
+</span><span class=lnt id=hl-1-40><a class=lnlinks href=#hl-1-40>40</a>
+</span><span class=lnt id=hl-1-41><a class=lnlinks href=#hl-1-41>41</a>
+</span><span class=lnt id=hl-1-42><a class=lnlinks href=#hl-1-42>42</a>
+</span><span class=lnt id=hl-1-43><a class=lnlinks href=#hl-1-43>43</a>
+</span><span class=lnt id=hl-1-44><a class=lnlinks href=#hl-1-44>44</a>
+</span><span class=lnt id=hl-1-45><a class=lnlinks href=#hl-1-45>45</a>
+</span><span class=lnt id=hl-1-46><a class=lnlinks href=#hl-1-46>46</a>
+</span><span class=lnt id=hl-1-47><a class=lnlinks href=#hl-1-47>47</a>
+</span><span class=lnt id=hl-1-48><a class=lnlinks href=#hl-1-48>48</a>
+</span><span class=lnt id=hl-1-49><a class=lnlinks href=#hl-1-49>49</a>
+</span><span class=lnt id=hl-1-50><a class=lnlinks href=#hl-1-50>50</a>
+</span><span class=lnt id=hl-1-51><a class=lnlinks href=#hl-1-51>51</a>
+</span><span class=lnt id=hl-1-52><a class=lnlinks href=#hl-1-52>52</a>
+</span><span class=lnt id=hl-1-53><a class=lnlinks href=#hl-1-53>53</a>
+</span><span class=lnt id=hl-1-54><a class=lnlinks href=#hl-1-54>54</a>
+</span><span class=lnt id=hl-1-55><a class=lnlinks href=#hl-1-55>55</a>
+</span><span class=lnt id=hl-1-56><a class=lnlinks href=#hl-1-56>56</a>
+</span><span class=lnt id=hl-1-57><a class=lnlinks href=#hl-1-57>57</a>
+</span><span class=lnt id=hl-1-58><a class=lnlinks href=#hl-1-58>58</a>
+</span><span class=lnt id=hl-1-59><a class=lnlinks href=#hl-1-59>59</a>
+</span><span class=lnt id=hl-1-60><a class=lnlinks href=#hl-1-60>60</a>
+</span><span class=lnt id=hl-1-61><a class=lnlinks href=#hl-1-61>61</a>
+</span><span class=lnt id=hl-1-62><a class=lnlinks href=#hl-1-62>62</a>
+</span><span class=lnt id=hl-1-63><a class=lnlinks href=#hl-1-63>63</a>
+</span><span class=lnt id=hl-1-64><a class=lnlinks href=#hl-1-64>64</a>
+</span><span class=lnt id=hl-1-65><a class=lnlinks href=#hl-1-65>65</a>
+</span><span class=lnt id=hl-1-66><a class=lnlinks href=#hl-1-66>66</a>
+</span><span class=lnt id=hl-1-67><a class=lnlinks href=#hl-1-67>67</a>
+</span><span class=lnt id=hl-1-68><a class=lnlinks href=#hl-1-68>68</a>
+</span><span class=lnt id=hl-1-69><a class=lnlinks href=#hl-1-69>69</a>
+</span><span class=lnt id=hl-1-70><a class=lnlinks href=#hl-1-70>70</a>
+</span><span class=lnt id=hl-1-71><a class=lnlinks href=#hl-1-71>71</a>
+</span><span class=lnt id=hl-1-72><a class=lnlinks href=#hl-1-72>72</a>
+</span><span class=lnt id=hl-1-73><a class=lnlinks href=#hl-1-73>73</a>
+</span><span class=lnt id=hl-1-74><a class=lnlinks href=#hl-1-74>74</a>
+</span><span class=lnt id=hl-1-75><a class=lnlinks href=#hl-1-75>75</a>
+</span><span class=lnt id=hl-1-76><a class=lnlinks href=#hl-1-76>76</a>
+</span><span class=lnt id=hl-1-77><a class=lnlinks href=#hl-1-77>77</a>
+</span><span class=lnt id=hl-1-78><a class=lnlinks href=#hl-1-78>78</a>
+</span><span class=lnt id=hl-1-79><a class=lnlinks href=#hl-1-79>79</a>
+</span><span class=lnt id=hl-1-80><a class=lnlinks href=#hl-1-80>80</a>
+</span><span class=lnt id=hl-1-81><a class=lnlinks href=#hl-1-81>81</a>
+</span><span class=lnt id=hl-1-82><a class=lnlinks href=#hl-1-82>82</a>
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-lua data-lang=lua><span class=line><span class=cl><span class=c1>-- batch_insert.lua</span>
+</span></span><span class=line><span class=cl><span class=c1>-- Sysbench Lua script for pg batch INSERT benchmark.</span>
+</span></span><span class=line><span class=cl><span class=c1>-- Accepts --batch-size=N on the CLI (passed via sysbench_options in mybench).</span>
+</span></span><span class=line><span class=cl><span class=c1>-- All row data is generated in the Lua VM (client side) before the query is sent.</span>
+</span></span><span class=line><span class=cl><span class=c1>--</span>
+</span></span><span class=line><span class=cl><span class=c1>-- Usage (standalone):</span>
+</span></span><span class=line><span class=cl><span class=c1>--   sysbench batch_insert.lua \</span>
+</span></span><span class=line><span class=cl><span class=c1>--     --pgsql-host=localhost --pgsql-port=5432 \</span>
+</span></span><span class=line><span class=cl><span class=c1>--     --pgsql-db=bench --pgsql-user=postgres \</span>
+</span></span><span class=line><span class=cl><span class=c1>--     --threads=8 --time=180 --batch-size=100 run</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>-- ---------------------------------------------------------------------------</span>
+</span></span><span class=line><span class=cl><span class=c1>-- Custom CLI options</span>
+</span></span><span class=line><span class=cl><span class=c1>-- ---------------------------------------------------------------------------</span>
+</span></span><span class=line><span class=cl><span class=n>sysbench.cmdline</span><span class=p>.</span><span class=n>options</span> <span class=o>=</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=n>batch_size</span> <span class=o>=</span> <span class=p>{</span><span class=s2>&#34;Number of rows to INSERT per transaction&#34;</span><span class=p>,</span> <span class=mi>1</span><span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>-- ---------------------------------------------------------------------------</span>
+</span></span><span class=line><span class=cl><span class=c1>-- Per-thread setup / teardown</span>
+</span></span><span class=line><span class=cl><span class=c1>-- ---------------------------------------------------------------------------</span>
+</span></span><span class=line><span class=cl><span class=kd>local</span> <span class=n>CURRENCIES</span> <span class=o>=</span> <span class=p>{</span><span class=s2>&#34;USD&#34;</span><span class=p>,</span> <span class=s2>&#34;EUR&#34;</span><span class=p>,</span> <span class=s2>&#34;GBP&#34;</span><span class=p>,</span> <span class=s2>&#34;AUD&#34;</span><span class=p>,</span> <span class=s2>&#34;SGD&#34;</span><span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=kd>local</span> <span class=n>CHANNELS</span>   <span class=o>=</span> <span class=p>{</span><span class=s2>&#34;web&#34;</span><span class=p>,</span> <span class=s2>&#34;mobile&#34;</span><span class=p>,</span> <span class=s2>&#34;pos&#34;</span><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kr>function</span> <span class=nf>thread_init</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=n>drv</span> <span class=o>=</span> <span class=n>sysbench.sql</span><span class=p>.</span><span class=n>driver</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=n>con</span> <span class=o>=</span> <span class=n>drv</span><span class=p>:</span><span class=n>connect</span><span class=p>()</span>
+</span></span><span class=line><span class=cl><span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kr>function</span> <span class=nf>thread_done</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=n>con</span><span class=p>:</span><span class=n>disconnect</span><span class=p>()</span>
+</span></span><span class=line><span class=cl><span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>-- ---------------------------------------------------------------------------</span>
+</span></span><span class=line><span class=cl><span class=c1>-- Main benchmark event</span>
+</span></span><span class=line><span class=cl><span class=c1>-- Each call = one transaction inserting `batch_size` rows.</span>
+</span></span><span class=line><span class=cl><span class=c1>-- The entire VALUES list is built in Lua (client side) before the query fires.</span>
+</span></span><span class=line><span class=cl><span class=c1>-- ---------------------------------------------------------------------------</span>
+</span></span><span class=line><span class=cl><span class=kr>function</span> <span class=nf>event</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>batch_size</span> <span class=o>=</span> <span class=n>tonumber</span><span class=p>(</span><span class=n>sysbench.opt</span><span class=p>.</span><span class=n>batch_size</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>values</span>     <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=kr>for</span> <span class=n>i</span> <span class=o>=</span> <span class=mi>1</span><span class=p>,</span> <span class=n>batch_size</span> <span class=kr>do</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>account_id</span>  <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span>      <span class=mi>100000</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>merchant_id</span> <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span>       <span class=mi>10000</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>amount</span>      <span class=o>=</span> <span class=n>math.floor</span><span class=p>(</span><span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>1000000</span><span class=p>))</span> <span class=o>/</span> <span class=mf>100.0</span>   <span class=c1>-- 2 decimal places</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>currency</span>    <span class=o>=</span> <span class=n>CURRENCIES</span><span class=p>[</span><span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=o>#</span><span class=n>CURRENCIES</span><span class=p>)]</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>status</span>      <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>3</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>txn_type</span>    <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>channel</span>     <span class=o>=</span> <span class=n>CHANNELS</span><span class=p>[</span><span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=o>#</span><span class=n>CHANNELS</span><span class=p>)]</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>attempt</span>     <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>4</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>device_id</span>   <span class=o>=</span> <span class=s2>&#34;device-&#34;</span> <span class=o>..</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>100000</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>ip</span>          <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>255</span><span class=p>)</span> <span class=o>..</span> <span class=s2>&#34;.&#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>                            <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>255</span><span class=p>)</span> <span class=o>..</span> <span class=s2>&#34;.&#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>                            <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>255</span><span class=p>)</span> <span class=o>..</span> <span class=s2>&#34;.&#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>                            <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>254</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>        <span class=c1>-- Escape single quotes in description just in case</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>description</span> <span class=o>=</span> <span class=s2>&#34;Payment ref-&#34;</span> <span class=o>..</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>1000000</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>        <span class=n>values</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=o>=</span> <span class=n>string.format</span><span class=p>(</span>
+</span></span><span class=line><span class=cl>            <span class=c1>-- account_id, merchant_id, amount, currency, status, type,</span>
+</span></span><span class=line><span class=cl>            <span class=c1>-- reference_id, description, ip_address, device_id, metadata,</span>
+</span></span><span class=line><span class=cl>            <span class=c1>-- created_at, updated_at</span>
+</span></span><span class=line><span class=cl>            <span class=s2>&#34;(%d, %d, %.2f, &#39;%s&#39;, %d, %d, gen_random_uuid(), &#39;%s&#39;, &#39;%s&#39;::inet, &#39;%s&#39;, &#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>            <span class=s2>&#34;&#39;{</span><span class=se>\&#34;</span><span class=s2>channel</span><span class=se>\&#34;</span><span class=s2>:</span><span class=se>\&#34;</span><span class=s2>%s</span><span class=se>\&#34;</span><span class=s2>,</span><span class=se>\&#34;</span><span class=s2>attempt</span><span class=se>\&#34;</span><span class=s2>:%d}&#39;::jsonb, clock_timestamp(), clock_timestamp())&#34;</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>            <span class=n>account_id</span><span class=p>,</span> <span class=n>merchant_id</span><span class=p>,</span> <span class=n>amount</span><span class=p>,</span> <span class=n>currency</span><span class=p>,</span> <span class=n>status</span><span class=p>,</span> <span class=n>txn_type</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>            <span class=n>description</span><span class=p>,</span> <span class=n>ip</span><span class=p>,</span> <span class=n>device_id</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>            <span class=n>channel</span><span class=p>,</span> <span class=n>attempt</span>
+</span></span><span class=line><span class=cl>        <span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>sql</span> <span class=o>=</span> <span class=s2>&#34;INSERT INTO transactions &#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>        <span class=s2>&#34;(account_id, merchant_id, amount, currency, status, type, &#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>        <span class=s2>&#34;reference_id, description, ip_address, device_id, metadata, &#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>        <span class=s2>&#34;created_at, updated_at) VALUES &#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>        <span class=n>table.concat</span><span class=p>(</span><span class=n>values</span><span class=p>,</span> <span class=s2>&#34;,&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=n>con</span><span class=p>:</span><span class=n>query</span><span class=p>(</span><span class=s2>&#34;BEGIN&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>con</span><span class=p>:</span><span class=n>query</span><span class=p>(</span><span class=n>sql</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>con</span><span class=p>:</span><span class=n>query</span><span class=p>(</span><span class=s2>&#34;COMMIT&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=kr>end</span>
+</span></span></code></pre></td></tr></table></div></div><h3 id=run-parameters>Run Parameters<a hidden class=anchor aria-hidden=true href=#run-parameters>#</a></h3><ul><li>Number of threads: 2. Meaning two sysbench clients will concurrently send requests to RDS</li><li>Duration: 180 seconds</li><li>Batch size: 1, 10, 50, 100, 500, 1000, 2000, 5000, 10000</li><li>Parameter value was used in the seeding file:</li></ul><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt id=hl-2-1><a class=lnlinks href=#hl-2-1>1</a>
+</span><span class=lnt id=hl-2-2><a class=lnlinks href=#hl-2-2>2</a>
+</span><span class=lnt id=hl-2-3><a class=lnlinks href=#hl-2-3>3</a>
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>NUM_ACCOUNTS 100000
+</span></span><span class=line><span class=cl>NUM_MERCHANTS 10000
+</span></span><span class=line><span class=cl>NUM_ROWS 10000
+</span></span></code></pre></td></tr></table></div></div><p>Sample sysbench command:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt id=hl-3-1><a class=lnlinks href=#hl-3-1>1</a>
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-bash data-lang=bash><span class=line><span class=cl>sysbench --db-driver<span class=o>=</span>pgsql --pgsql-host<span class=o>=</span>localhost --pgsql-port<span class=o>=</span><span class=m>5432</span> --pgsql-user<span class=o>=</span>postgres --pgsql-password<span class=o>=</span>password --pgsql-db<span class=o>=</span>benchmark --threads<span class=o>=</span><span class=m>2</span> --time<span class=o>=</span><span class=m>180</span> --batch-size<span class=o>=</span><span class=m>10000</span> --report-interval<span class=o>=</span><span class=m>5</span> ./benchmark.lua run
+</span></span></code></pre></td></tr></table></div></div><h3 id=methodology>Methodology<a hidden class=anchor aria-hidden=true href=#methodology>#</a></h3><ol><li>Choose a batch size (from small to large)</li><li>Drop the table if exist. Create the table and seeding some data.</li><li>Update statistic and request checkpoint.</li><li>Warm data.</li><li>Run sysbench benchmark. during the run, collect postgres metrics: pg_stat_activity, pg_stat_statement, pg_stat_tables,&mldr;, collect OS metrics: CPU, Disk, Memory,&mldr;</li><li>Drop the table</li><li>Wait for 30s and to the next benchmark with different batch size</li></ol><p>All postgres metrics are collect in every 10 seconds and store to a timeseries database for analyze. OS metrics are collect every minute.</p><p>Note: since the EC2 and RDS instances are burstable, I only do benchmark when I got a alot of CPU and IO burstable credit, make sure it&rsquo;s won&rsquo;t ever run out during benchmark.</p><p>Weak points:</p><ul><li>All data are fit on share buffer</li><li>for each batch size, benchmark is ran once, can suffer from outlier</li><li>Since we use RDS, OS metrics from Enhance monitoring are not comprehensive</li><li><code>max_wal_size</code> of the instance is 2GB, <code>checkpoint_completion_target</code> is 0.9, checkpoint_timeout is 5 minutes . With the benchmark running in 180s, produce at most 2M row, it won&rsquo;t trigger checkpoint during benchmark.</li></ul><h2 id=result>Result<a hidden class=anchor aria-hidden=true href=#result>#</a></h2><h3 id=overview>Overview<a hidden class=anchor aria-hidden=true href=#overview>#</a></h3><table><thead><tr><th>Metric</th><th>batch_1</th><th>batch_10</th><th>batch_50</th><th>batch_100</th><th>batch_500</th><th>batch_1000</th><th>batch_2000</th><th>batch_5000</th><th>batch_10000</th></tr></thead><tbody><tr><td>TPS</td><td>505.44</td><td>412.13</td><td>199.02</td><td>122.48</td><td>23.89</td><td>9.00</td><td>3.57</td><td>1.01</td><td>0.28</td></tr><tr><td>QPS</td><td>1516.31</td><td>1236.40</td><td>597.06</td><td>367.44</td><td>71.67</td><td>26.99</td><td>10.71</td><td>3.02</td><td>0.84</td></tr><tr><td>Avg Latency (ms)</td><td>3.95</td><td>4.85</td><td>10.05</td><td>16.33</td><td>83.70</td><td>222.31</td><td>560.33</td><td>1982.84</td><td>7135.48</td></tr><tr><td>p95 Latency (ms)</td><td>4.25</td><td>5.57</td><td>11.24</td><td>19.29</td><td>164.45</td><td>669.89</td><td>1903.57</td><td>6835.96</td><td>22034.77</td></tr><tr><td>Transactions</td><td>90981</td><td>74187</td><td>35825</td><td>22048</td><td>4301</td><td>1656</td><td>675</td><td>185</td><td>55</td></tr><tr><td>Rows Inserted</td><td>90,981</td><td>741,870</td><td>1,791,250</td><td>2,204,800</td><td>2,150,500</td><td>1,656,000</td><td>1,350,000</td><td>925,000</td><td>550,000</td></tr></tbody></table><h4 id=rows-inserted-vs-avg-latency>Rows Inserted vs Avg Latency<a hidden class=anchor aria-hidden=true href=#rows-inserted-vs-avg-latency>#</a></h4><div style="position:relative;width:100%;max-width:800px;margin:20px auto"><canvas id=chart-transactions_latency></canvas></div><script>document.addEventListener("DOMContentLoaded",function(){const e=document.getElementById("chart-transactions_latency").getContext("2d"),t={data:{datasets:[{backgroundColor:"rgba(37, 99, 235, 0.12)",borderColor:"#2563eb",borderWidth:2,data:[90981,741870,1791250,2204800,2150500,1656e3,135e4,925e3,55e4],fill:!0,label:"Rows Inserted",tension:.35,yAxisID:"y"},{backgroundColor:"rgba(220, 38, 38, 0.12)",borderColor:"#dc2626",borderWidth:2,data:[3.95,4.85,10.05,16.33,83.7,222.31,560.33,1982.84,7135.48],fill:!0,label:"Avg Latency (ms)",tension:.35,yAxisID:"y1"}],labels:["batch_1","batch_10","batch_50","batch_100","batch_500","batch_1000","batch_2000","batch_5000","batch_10000"]},options:{interaction:{intersect:!1,mode:"index"},responsive:!0,scales:{y:{display:!0,position:"left",title:{display:!0,text:"Rows Inserted"},type:"linear"},y1:{display:!0,grid:{drawOnChartArea:!1},position:"right",title:{display:!0,text:"Avg Latency (ms)"},type:"linear"}}},type:"line"};new Chart(e,t)})</script><h4 id=avg-latency-vs-p95-latency>Avg Latency vs p95 Latency<a hidden class=anchor aria-hidden=true href=#avg-latency-vs-p95-latency>#</a></h4><div style="position:relative;width:100%;max-width:800px;margin:20px auto"><canvas id=chart-latency_p95></canvas></div><script>document.addEventListener("DOMContentLoaded",function(){const e=document.getElementById("chart-latency_p95").getContext("2d"),t={data:{datasets:[{backgroundColor:"rgba(234, 88, 12, 0.12)",borderColor:"#ea580c",borderWidth:2,data:[3.95,4.85,10.05,16.33,83.7,222.31,560.33,1982.84,7135.48],fill:!1,label:"Avg Latency (ms)",tension:.35},{backgroundColor:"rgba(124, 58, 237, 0.12)",borderColor:"#7c3aed",borderWidth:2,data:[4.25,5.57,11.24,19.29,164.45,669.89,1903.57,6835.96,22034.77],fill:!1,label:"p95 Latency (ms)",tension:.35}],labels:["batch_1","batch_10","batch_50","batch_100","batch_500","batch_1000","batch_2000","batch_5000","batch_10000"]},options:{interaction:{intersect:!1,mode:"index"},responsive:!0,scales:{x:{title:{display:!0,text:"Batch Size"}},y:{beginAtZero:!0,title:{display:!0,text:"Latency (ms)"}}}},type:"line"};new Chart(e,t)})</script><p>As you can see, both throughput (row inserted) and latency perform best at batch 100 for this specific workload and environment. Increase batch size larger than 100 barely help. That mean, for each workload and environment, there is a batch size that work best.</p><h3 id=average-active-session-aas>Average Active Session (AAS)<a hidden class=anchor aria-hidden=true href=#average-active-session-aas>#</a></h3><p>During the benchmark run, my tool my take a snapshot of <code>pg_stat_activity</code> every 10s and store as a timeseries. In this analysis, we will care about the column <code>wait_event</code> and <code>wait_event_type</code>. Those two can let&rsquo;s we know what are the transaction are waiting on.</p><p>The query to compute the AAS table bellow are look like this:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt id=hl-4-1><a class=lnlinks href=#hl-4-1> 1</a>
+</span><span class=lnt id=hl-4-2><a class=lnlinks href=#hl-4-2> 2</a>
+</span><span class=lnt id=hl-4-3><a class=lnlinks href=#hl-4-3> 3</a>
+</span><span class=lnt id=hl-4-4><a class=lnlinks href=#hl-4-4> 4</a>
+</span><span class=lnt id=hl-4-5><a class=lnlinks href=#hl-4-5> 5</a>
+</span><span class=lnt id=hl-4-6><a class=lnlinks href=#hl-4-6> 6</a>
+</span><span class=lnt id=hl-4-7><a class=lnlinks href=#hl-4-7> 7</a>
+</span><span class=lnt id=hl-4-8><a class=lnlinks href=#hl-4-8> 8</a>
+</span><span class=lnt id=hl-4-9><a class=lnlinks href=#hl-4-9> 9</a>
+</span><span class=lnt id=hl-4-10><a class=lnlinks href=#hl-4-10>10</a>
+</span><span class=lnt id=hl-4-11><a class=lnlinks href=#hl-4-11>11</a>
+</span><span class=lnt id=hl-4-12><a class=lnlinks href=#hl-4-12>12</a>
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-sql data-lang=sql><span class=line><span class=cl><span class=k>SELECT</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>COALESCE</span><span class=p>(</span><span class=n>wait_event_type</span><span class=p>,</span><span class=w> </span><span class=s1>&#39;CPU&#39;</span><span class=p>)</span><span class=w> </span><span class=k>AS</span><span class=w> </span><span class=n>wait_event_type</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=n>COALESCE</span><span class=p>(</span><span class=n>wait_event</span><span class=p>,</span><span class=w> </span><span class=s1>&#39;running&#39;</span><span class=p>)</span><span class=w>  </span><span class=k>AS</span><span class=w> </span><span class=n>wait_event</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>COUNT</span><span class=p>(</span><span class=o>*</span><span class=p>)</span><span class=w>                          </span><span class=k>AS</span><span class=w> </span><span class=n>occurrences</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>COUNT</span><span class=p>(</span><span class=k>DISTINCT</span><span class=w> </span><span class=n>_collected_at</span><span class=p>)</span><span class=w>     </span><span class=k>AS</span><span class=w> </span><span class=n>snapshot_count</span><span class=p>,</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>COUNT</span><span class=p>(</span><span class=o>*</span><span class=p>)</span><span class=o>/</span><span class=k>COUNT</span><span class=p>(</span><span class=k>DISTINCT</span><span class=w> </span><span class=n>_collected_at</span><span class=p>)</span><span class=w> </span><span class=k>AS</span><span class=w> </span><span class=n>aas</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>FROM</span><span class=w> </span><span class=n>snap_pg_stat_activity</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>WHERE</span><span class=w> </span><span class=n>_run_id</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>?</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=k>AND</span><span class=w> </span><span class=k>state</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=s1>&#39;active&#39;</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>GROUP</span><span class=w> </span><span class=k>BY</span><span class=w> </span><span class=mi>1</span><span class=p>,</span><span class=w> </span><span class=mi>2</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>ORDER</span><span class=w> </span><span class=k>BY</span><span class=w> </span><span class=mi>3</span><span class=w> </span><span class=k>DESC</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=k>LIMIT</span><span class=w> </span><span class=mi>20</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p>For example, during benchmark 180s, we take a snapshot every 10s, there are 18 snapshots. the wait <code>IO:DataFileRead</code> occurs 2 times in 2 snapshot, it&rsquo;s AAS is 2/2 = 1.</p><h4 id=walsync-and-walwrite-lock-explain>WalSync and WalWrite lock explain<a hidden class=anchor aria-hidden=true href=#walsync-and-walwrite-lock-explain>#</a></h4><p>In this benchmark, we will see WalSync and WalWrite quite often. So I want to introduce about it.</p><p>In Postgres, there is a Wal buffer (4MB default). During the time data is sync to storage (long), the running transaction will write data to this buffer, and waiting for the next sync. This is a way to batch commits together and called group commit. LWLock:WalWrite and LWLock:WalSync is to protect this buffer.
+When the transaction commit, it will call</p><table><thead><tr><th>Wait Event</th><th>Description</th></tr></thead><tbody><tr><td>LWLock:WalInsert</td><td>Waiting to insert WAL data into a memory buffer.</td></tr><tr><td>LWLock:WalWrite</td><td>Waiting for WAL buffers to be written to disk.</td></tr><tr><td>IO:WalWrite</td><td>Waiting for a write to a WAL file.</td></tr><tr><td>IO:WalSync</td><td>Waiting for a WAL file to reach durable storage.</td></tr></tbody></table><p><strong>LWLock:WalInsert</strong>
+This is a set of 8 locks protects the in memory WAL ring buffer. When a transaction want to write WAL record to WAL buffer. 8 locks meaning maximum 8 transactions can concurrently insert to wal buffer.</p><ol><li>Reserve space in Wal buffer. No lock, CurrBytePos: [atomic fetch-and-add]</li><li>Copy data to reserved range in wal buffer (need one of 8 locks)</li></ol><p><strong>IO:WalWrite</strong> the <code>write</code> syscall
+The first transaction (leader) in group commit will write wal buffer to os page cache.</p><p><strong>IO:WalSync</strong> the <code>fdatasync</code> syscall
+The leader in group commit wait for the OS to confirm data has physically reach the storage.</p><p><strong>LWLock:WalWrite</strong>
+The leader in group commit will take responsibility to write data to storage. the followers in group commit will wait on this.</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt id=hl-5-1><a class=lnlinks href=#hl-5-1> 1</a>
+</span><span class=lnt id=hl-5-2><a class=lnlinks href=#hl-5-2> 2</a>
+</span><span class=lnt id=hl-5-3><a class=lnlinks href=#hl-5-3> 3</a>
+</span><span class=lnt id=hl-5-4><a class=lnlinks href=#hl-5-4> 4</a>
+</span><span class=lnt id=hl-5-5><a class=lnlinks href=#hl-5-5> 5</a>
+</span><span class=lnt id=hl-5-6><a class=lnlinks href=#hl-5-6> 6</a>
+</span><span class=lnt id=hl-5-7><a class=lnlinks href=#hl-5-7> 7</a>
+</span><span class=lnt id=hl-5-8><a class=lnlinks href=#hl-5-8> 8</a>
+</span><span class=lnt id=hl-5-9><a class=lnlinks href=#hl-5-9> 9</a>
+</span><span class=lnt id=hl-5-10><a class=lnlinks href=#hl-5-10>10</a>
+</span><span class=lnt id=hl-5-11><a class=lnlinks href=#hl-5-11>11</a>
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>All</span> <span class=n>backends</span> <span class=p>(</span><span class=n>parallel</span><span class=p>,</span> <span class=n>competing</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=err>└──</span> <span class=n>LWLock</span><span class=p>:</span><span class=n>WalInsert</span>  <span class=err>→</span>  <span class=n>write</span> <span class=n>own</span> <span class=n>record</span> <span class=n>to</span> <span class=n>WAL</span> <span class=n>buffer</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>Flush</span> <span class=n>point</span> <span class=n>reached</span>
+</span></span><span class=line><span class=cl>    <span class=err>├──</span> <span class=n>One</span> <span class=n>backend</span> <span class=n>becomes</span> <span class=n>leader</span>
+</span></span><span class=line><span class=cl>    <span class=err>│</span>       <span class=err>└──</span> <span class=n>IO</span><span class=p>:</span><span class=n>WalWrite</span> <span class=err>→</span> <span class=n>IO</span><span class=p>:</span><span class=n>WalSync</span> <span class=err>→</span> <span class=n>signals</span> <span class=n>completion</span>
+</span></span><span class=line><span class=cl>    <span class=err>│</span>
+</span></span><span class=line><span class=cl>    <span class=err>└──</span> <span class=n>Everyone</span> <span class=k>else</span> <span class=n>becomes</span> <span class=n>followers</span>
+</span></span><span class=line><span class=cl>            <span class=err>└──</span> <span class=n>LWLock</span><span class=p>:</span><span class=n>WalWrite</span>  <span class=p>(</span><span class=n>waiting</span> <span class=k>for</span> <span class=n>leader</span><span class=s1>&#39;s signal)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>Leader</span> <span class=n>signals</span> <span class=err>→</span> <span class=n>followers</span> <span class=n>wake</span> <span class=n>up</span> <span class=err>→</span> <span class=n>all</span> <span class=n>proceed</span> <span class=n>to</span> <span class=n>commit</span>
+</span></span></code></pre></td></tr></table></div></div><h4 id=other-waits>Other waits<a hidden class=anchor aria-hidden=true href=#other-waits>#</a></h4><p><strong>CPU:running</strong>
+This isn&rsquo;t wait, this mean the backend is running with cpu, not waiting on anything.
+But it&rsquo;s not good if this is higher than vCPU. It indicating that the CPU is overload.</p><p><strong>Client:ClientRead</strong>
+Waiting to read data from the client.
+This mean the client is slow and can&rsquo;t keep up with the speed of postgres. There can be because of slow network between client and postgres.</p><p><strong>IO:DataFileRead</strong>
+Waiting for a read from a relation data file.</p><p><strong>Timeout:VacuumDelay</strong>
+Waiting in a cost-based vacuum delay point.</p><p><strong>IO:DataFileExtend</strong>
+Waiting for a relation data file to be extended. Tables and indexes in Postgres are files under the hood. When there are no free pages left in the files, postgres must extend the files by writing empty pages to it.</p><p><strong>Lock:extend</strong>
+Waiting to extend a relation. only one relation can extend at a time.</p><p><strong>LWLock:BufferContent</strong>
+Waiting to access a data page in memory. Each 8KB pages in shared buffer has a internal latch (light weight lock), transaction when access these page need to acquire this lock.</p><p><strong>IO:WalInitWrite</strong>
+Waiting for a write while initializing a new WAL file.</p><h4 id=batch_1>batch_1<a hidden class=anchor aria-hidden=true href=#batch_1>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/2 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>19</td><td>1.06</td></tr><tr><td>IO</td><td>WalSync</td><td>12</td><td>1.00</td></tr><tr><td>LWLock</td><td>WALWrite</td><td>1</td><td>1.00</td></tr></tbody></table><p>From the batch 1, we already see pressure on the WAL because of this write heavy workload.</p><h4 id=batch_10>batch_10<a hidden class=anchor aria-hidden=true href=#batch_10>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/2 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>26</td><td>1.44</td></tr><tr><td>Client</td><td>ClientRead</td><td>7</td><td>1.17</td></tr><tr><td>IO</td><td>WalSync</td><td>6</td><td>1.00</td></tr><tr><td>LWLock</td><td>WALWrite</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_50>batch_50<a hidden class=anchor aria-hidden=true href=#batch_50>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/2 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>33</td><td>1.74</td></tr><tr><td>Client</td><td>ClientRead</td><td>7</td><td>1.17</td></tr><tr><td>IO</td><td>WalSync</td><td>4</td><td>1.00</td></tr><tr><td>IO</td><td>DataFileRead</td><td>2</td><td>1.00</td></tr><tr><td>IO</td><td>WalInitWrite</td><td>1</td><td>1.00</td></tr><tr><td>LWLock</td><td>WALWrite</td><td>1</td><td>1.00</td></tr><tr><td>Timeout</td><td>VacuumDelay</td><td>1</td><td>1.00</td></tr></tbody></table><p>Until batch 50, the postgres is still under utilization AAS &lt; 2 vCPU baseline.</p><h4 id=batch_100>batch_100<a hidden class=anchor aria-hidden=true href=#batch_100>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/2 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>40</td><td>2.22</td></tr><tr><td>Client</td><td>ClientRead</td><td>3</td><td>1.00</td></tr><tr><td>Lock</td><td>extend</td><td>2</td><td>2.00</td></tr><tr><td>Timeout</td><td>VacuumDelay</td><td>2</td><td>2.00</td></tr><tr><td>IO</td><td>DataFileExtend</td><td>1</td><td>1.00</td></tr><tr><td>IO</td><td>DataFileRead</td><td>1</td><td>1.00</td></tr><tr><td>LWLock</td><td>BufferContent</td><td>1</td><td>1.00</td></tr></tbody></table><p>The CPU is overload here.</p><h4 id=batch_500>batch_500<a hidden class=anchor aria-hidden=true href=#batch_500>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/2 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>58</td><td>3.05</td></tr><tr><td>Client</td><td>ClientRead</td><td>2</td><td>1.00</td></tr><tr><td>Timeout</td><td>VacuumDelay</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_1000>batch_1000<a hidden class=anchor aria-hidden=true href=#batch_1000>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/2 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>71</td><td>3.74</td></tr><tr><td>Client</td><td>ClientRead</td><td>1</td><td>1.00</td></tr><tr><td>LWLock</td><td>BufferContent</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_2000>batch_2000<a hidden class=anchor aria-hidden=true href=#batch_2000>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/2 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>68</td><td>3.58</td></tr><tr><td>Client</td><td>ClientRead</td><td>1</td><td>1.00</td></tr><tr><td>LWLock</td><td>BufferContent</td><td>1</td><td>1.00</td></tr><tr><td>Timeout</td><td>VacuumDelay</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_5000>batch_5000<a hidden class=anchor aria-hidden=true href=#batch_5000>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/2 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>65</td><td>3.42</td></tr><tr><td>Timeout</td><td>VacuumDelay</td><td>3</td><td>1.00</td></tr><tr><td>LWLock</td><td>BufferContent</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_10000>batch_10000<a hidden class=anchor aria-hidden=true href=#batch_10000>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/2 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>72</td><td>3.60</td></tr><tr><td>LWLock</td><td>BufferContent</td><td>2</td><td>1.00</td></tr><tr><td>Client</td><td>ClientRead</td><td>1</td><td>1.00</td></tr><tr><td>IO</td><td>DataFileExtend</td><td>1</td><td>1.00</td></tr></tbody></table><h3 id=os-metrics>OS metrics<a hidden class=anchor aria-hidden=true href=#os-metrics>#</a></h3><p>peak cpu
+batch_1
+19.4%
+batch_10
+25.6%
+batch_50
+42.5%
+batch_100
+48.5%
+batch_500
+51.6%
+batch_1000
+45.7%
+batch_2000
+42.3%
+batch_5000
+41.6%
+batch_10000
+36.3%</p><h2 id=unnest-insert>Unnest insert<a hidden class=anchor aria-hidden=true href=#unnest-insert>#</a></h2><h3 id=overview-1>Overview<a hidden class=anchor aria-hidden=true href=#overview-1>#</a></h3><table><thead><tr><th>Metric</th><th>batch_1</th><th>batch_10</th><th>batch_50</th><th>batch_100</th><th>batch_500</th><th>batch_1000</th><th>batch_2000</th><th>batch_5000</th><th>batch_10000</th></tr></thead><tbody><tr><td>TPS</td><td>473.85</td><td>421.61</td><td>223.23</td><td>118.58</td><td>24.46</td><td>12.18</td><td>6.05</td><td>2.24</td><td>0.38</td></tr><tr><td>QPS</td><td>1421.54</td><td>1264.82</td><td>669.70</td><td>355.74</td><td>73.39</td><td>36.53</td><td>18.14</td><td>6.72</td><td>1.15</td></tr><tr><td>Avg Latency (ms)</td><td>4.22</td><td>4.74</td><td>8.96</td><td>16.86</td><td>81.73</td><td>163.95</td><td>330.71</td><td>891.89</td><td>5229.24</td></tr><tr><td>p95 Latency (ms)</td><td>4.91</td><td>5.77</td><td>16.12</td><td>38.94</td><td>383.33</td><td>669.89</td><td>1235.62</td><td>2828.87</td><td>21255.35</td></tr><tr><td>Transactions</td><td>85296</td><td>75892</td><td>40187</td><td>21346</td><td>4409</td><td>2200</td><td>1091</td><td>406</td><td>78</td></tr><tr><td>Rows Inserted</td><td>85,296</td><td>758,920</td><td>2,009,350</td><td>2,134,600</td><td>2,204,500</td><td>2,200,000</td><td>2,182,000</td><td>2,030,000</td><td>780,000</td></tr></tbody></table><h4 id=rows-inserted-vs-avg-latency-1>Rows Inserted vs Avg Latency<a hidden class=anchor aria-hidden=true href=#rows-inserted-vs-avg-latency-1>#</a></h4><div style="position:relative;width:100%;max-width:800px;margin:20px auto"><canvas id=chart-unnest_rows_latency></canvas></div><script>document.addEventListener("DOMContentLoaded",function(){const e=document.getElementById("chart-unnest_rows_latency").getContext("2d"),t={data:{datasets:[{backgroundColor:"rgba(37, 99, 235, 0.12)",borderColor:"#2563eb",borderWidth:2,data:[85296,758920,2009350,2134600,2204500,22e5,2182e3,203e4,78e4],fill:!0,label:"Rows Inserted",tension:.35,yAxisID:"y"},{backgroundColor:"rgba(220, 38, 38, 0.12)",borderColor:"#dc2626",borderWidth:2,data:[4.22,4.74,8.96,16.86,81.73,163.95,330.71,891.89,5229.24],fill:!0,label:"Avg Latency (ms)",tension:.35,yAxisID:"y1"}],labels:["batch_1","batch_10","batch_50","batch_100","batch_500","batch_1000","batch_2000","batch_5000","batch_10000"]},options:{interaction:{intersect:!1,mode:"index"},responsive:!0,scales:{y:{display:!0,position:"left",title:{display:!0,text:"Rows Inserted"},type:"linear"},y1:{display:!0,grid:{drawOnChartArea:!1},position:"right",title:{display:!0,text:"Avg Latency (ms)"},type:"linear"}}},type:"line"};new Chart(e,t)})</script><h4 id=avg-latency-vs-p95-latency-1>Avg Latency vs p95 Latency<a hidden class=anchor aria-hidden=true href=#avg-latency-vs-p95-latency-1>#</a></h4><div style="position:relative;width:100%;max-width:800px;margin:20px auto"><canvas id=chart-unnest_latency_p95></canvas></div><script>document.addEventListener("DOMContentLoaded",function(){const e=document.getElementById("chart-unnest_latency_p95").getContext("2d"),t={data:{datasets:[{backgroundColor:"rgba(234, 88, 12, 0.12)",borderColor:"#ea580c",borderWidth:2,data:[4.22,4.74,8.96,16.86,81.73,163.95,330.71,891.89,5229.24],fill:!1,label:"Avg Latency (ms)",tension:.35},{backgroundColor:"rgba(124, 58, 237, 0.12)",borderColor:"#7c3aed",borderWidth:2,data:[4.91,5.77,16.12,38.94,383.33,669.89,1235.62,2828.87,21255.35],fill:!1,label:"p95 Latency (ms)",tension:.35}],labels:["batch_1","batch_10","batch_50","batch_100","batch_500","batch_1000","batch_2000","batch_5000","batch_10000"]},options:{interaction:{intersect:!1,mode:"index"},responsive:!0,scales:{x:{title:{display:!0,text:"Batch Size"}},y:{beginAtZero:!0,title:{display:!0,text:"Latency (ms)"}}}},type:"line"};new Chart(e,t)})</script><h4 id=cpu>CPU<a hidden class=anchor aria-hidden=true href=#cpu>#</a></h4><div style="position:relative;width:100%;max-width:800px;margin:20px auto"><canvas id=chart-unnest_cpu></canvas></div><script>document.addEventListener("DOMContentLoaded",function(){const e=document.getElementById("chart-unnest_cpu").getContext("2d"),t={data:{datasets:[{backgroundColor:"rgba(37, 99, 235, 0.12)",borderColor:"#2563eb",borderWidth:2,data:[42.9,51.6,62.5,71.7,91.6,94.4,95.5,99.3,99.8],fill:!1,label:"Total CPU%",tension:.35},{backgroundColor:"rgba(22, 163, 74, 0.12)",borderColor:"#16a34a",borderWidth:2,data:[1.9,2.4,3.2,3.5,3.9,4.3,4.4,13.7,2.7],fill:!1,label:"User CPU%",tension:.35},{backgroundColor:"rgba(234, 88, 12, 0.12)",borderColor:"#ea580c",borderWidth:2,data:[4.8,6.4,8.6,9.6,11.1,10.6,10.9,20.5,15.5],fill:!1,label:"System CPU%",tension:.35},{backgroundColor:"rgba(220, 38, 38, 0.12)",borderColor:"#dc2626",borderWidth:2,data:[21.1,22,16.5,16.1,34.3,37,36,48.5,74.9],fill:!1,label:"Wait CPU%",tension:.35}],labels:["batch_1","batch_10","batch_50","batch_100","batch_500","batch_1000","batch_2000","batch_5000","batch_10000"]},options:{interaction:{intersect:!1,mode:"index"},responsive:!0,scales:{x:{title:{display:!0,text:"Batch Size"}},y:{beginAtZero:!0,title:{display:!0,text:"CPU%"}}}},type:"line"};new Chart(e,t)})</script><h4 id=io>IO<a hidden class=anchor aria-hidden=true href=#io>#</a></h4><h5 id=write-iops-vs-read-iops>Write IOPS vs Read IOPS<a hidden class=anchor aria-hidden=true href=#write-iops-vs-read-iops>#</a></h5><div style="position:relative;width:100%;max-width:800px;margin:20px auto"><canvas id=chart-unnest_iops></canvas></div><script>document.addEventListener("DOMContentLoaded",function(){const e=document.getElementById("chart-unnest_iops").getContext("2d"),t={data:{datasets:[{backgroundColor:"rgba(220, 38, 38, 0.12)",borderColor:"#dc2626",borderWidth:2,data:[9.6,10.55,11.93,17.85,17.28,16.68,22.3,68.91,42.59],fill:!1,label:"Write IOPS",tension:.35,yAxisID:"y"},{backgroundColor:"rgba(37, 99, 235, 0.12)",borderColor:"#2563eb",borderWidth:2,data:[5.25,76.9,198.48,289.02,322.38,307.72,470.2,2400,2400],fill:!1,label:"Read IOPS",tension:.35,yAxisID:"y1"}],labels:["batch_1","batch_10","batch_50","batch_100","batch_500","batch_1000","batch_2000","batch_5000","batch_10000"]},options:{interaction:{intersect:!1,mode:"index"},responsive:!0,scales:{x:{title:{display:!0,text:"Batch Size"}},y:{beginAtZero:!0,display:!0,position:"left",title:{display:!0,text:"Write IOPS"},type:"linear"},y1:{beginAtZero:!0,display:!0,grid:{drawOnChartArea:!1},position:"right",title:{display:!0,text:"Read IOPS"},type:"linear"}}},type:"line"};new Chart(e,t)})</script><h5 id=disk-queue-length-vs-await>Disk Queue Length vs Await<a hidden class=anchor aria-hidden=true href=#disk-queue-length-vs-await>#</a></h5><div style="position:relative;width:100%;max-width:800px;margin:20px auto"><canvas id=chart-unnest_disk></canvas></div><script>document.addEventListener("DOMContentLoaded",function(){const e=document.getElementById("chart-unnest_disk").getContext("2d"),t={data:{datasets:[{backgroundColor:"rgba(124, 58, 237, 0.12)",borderColor:"#7c3aed",borderWidth:2,data:[.01,.06,.15,.22,.25,.24,.36,12.83,19.48],fill:!1,label:"Disk Queue Length",tension:.35,yAxisID:"y"},{backgroundColor:"rgba(234, 88, 12, 0.12)",borderColor:"#ea580c",borderWidth:2,data:[.84,.72,.72,.72,.73,.73,.74,5.22,7.99],fill:!1,label:"Await (ms)",tension:.35,yAxisID:"y1"}],labels:["batch_1","batch_10","batch_50","batch_100","batch_500","batch_1000","batch_2000","batch_5000","batch_10000"]},options:{interaction:{intersect:!1,mode:"index"},responsive:!0,scales:{x:{title:{display:!0,text:"Batch Size"}},y:{beginAtZero:!0,display:!0,position:"left",title:{display:!0,text:"Disk Queue Length"},type:"linear"},y1:{beginAtZero:!0,display:!0,grid:{drawOnChartArea:!1},position:"right",title:{display:!0,text:"Await (ms)"},type:"linear"}}},type:"line"};new Chart(e,t)})</script><h5 id=utilization>Utilization<a hidden class=anchor aria-hidden=true href=#utilization>#</a></h5><p>+1m 0s
+batch_10000: 98.60
+batch_5000: 87.96
+batch_2000: 29.97
+batch_500: 23.78
+batch_1000: 22.32
+batch_100: 20.70
+batch_50: 14.98
+batch_10: 6.67
+batch_1: 1.28</p><h3 id=load-average>Load Average:<a hidden class=anchor aria-hidden=true href=#load-average>#</a></h3><p>+1m 0s
+batch_10000: 14.23
+batch_5000: 10.28
+batch_1000: 3.08
+batch_2000: 2.54
+batch_500: 2.53
+batch_50: 2.26
+batch_100: 1.30
+batch_10: 1.08
+batch_1: 0.67</p><h2 id=comparison>Comparison<a hidden class=anchor aria-hidden=true href=#comparison>#</a></h2><h3 id=rows-inserted>Rows Inserted<a hidden class=anchor aria-hidden=true href=#rows-inserted>#</a></h3><div style="position:relative;width:100%;max-width:800px;margin:20px auto"><canvas id=chart-compare_rows_inserted></canvas></div><script>document.addEventListener("DOMContentLoaded",function(){const e=document.getElementById("chart-compare_rows_inserted").getContext("2d"),t={data:{datasets:[{backgroundColor:"rgba(37, 99, 235, 0.12)",borderColor:"#2563eb",borderWidth:2,data:[90981,741870,1791250,2204800,2150500,1656e3,135e4,925e3,55e4],fill:!1,label:"VALUES insert",tension:.35},{backgroundColor:"rgba(22, 163, 74, 0.12)",borderColor:"#16a34a",borderWidth:2,data:[85296,758920,2009350,2134600,2204500,22e5,2182e3,203e4,78e4],fill:!1,label:"Unnest insert",tension:.35}],labels:["batch_1","batch_10","batch_50","batch_100","batch_500","batch_1000","batch_2000","batch_5000","batch_10000"]},options:{interaction:{intersect:!1,mode:"index"},responsive:!0,scales:{x:{title:{display:!0,text:"Batch Size"}},y:{beginAtZero:!0,title:{display:!0,text:"Rows Inserted"}}}},type:"line"};new Chart(e,t)})</script><h3 id=avg-latency>Avg Latency<a hidden class=anchor aria-hidden=true href=#avg-latency>#</a></h3><div style="position:relative;width:100%;max-width:800px;margin:20px auto"><canvas id=chart-compare_avg_latency></canvas></div><script>document.addEventListener("DOMContentLoaded",function(){const e=document.getElementById("chart-compare_avg_latency").getContext("2d"),t={data:{datasets:[{backgroundColor:"rgba(37, 99, 235, 0.12)",borderColor:"#2563eb",borderWidth:2,data:[3.95,4.85,10.05,16.33,83.7,222.31,560.33,1982.84,7135.48],fill:!1,label:"VALUES insert",tension:.35},{backgroundColor:"rgba(22, 163, 74, 0.12)",borderColor:"#16a34a",borderWidth:2,data:[4.22,4.74,8.96,16.86,81.73,163.95,330.71,891.89,5229.24],fill:!1,label:"Unnest insert",tension:.35}],labels:["batch_1","batch_10","batch_50","batch_100","batch_500","batch_1000","batch_2000","batch_5000","batch_10000"]},options:{interaction:{intersect:!1,mode:"index"},responsive:!0,scales:{x:{title:{display:!0,text:"Batch Size"}},y:{beginAtZero:!0,title:{display:!0,text:"Avg Latency (ms)"}}}},type:"line"};new Chart(e,t)})</script><h3 id=sysbench-lua-script-1>Sysbench Lua script<a hidden class=anchor aria-hidden=true href=#sysbench-lua-script-1>#</a></h3><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt id=hl-6-1><a class=lnlinks href=#hl-6-1>  1</a>
+</span><span class=lnt id=hl-6-2><a class=lnlinks href=#hl-6-2>  2</a>
+</span><span class=lnt id=hl-6-3><a class=lnlinks href=#hl-6-3>  3</a>
+</span><span class=lnt id=hl-6-4><a class=lnlinks href=#hl-6-4>  4</a>
+</span><span class=lnt id=hl-6-5><a class=lnlinks href=#hl-6-5>  5</a>
+</span><span class=lnt id=hl-6-6><a class=lnlinks href=#hl-6-6>  6</a>
+</span><span class=lnt id=hl-6-7><a class=lnlinks href=#hl-6-7>  7</a>
+</span><span class=lnt id=hl-6-8><a class=lnlinks href=#hl-6-8>  8</a>
+</span><span class=lnt id=hl-6-9><a class=lnlinks href=#hl-6-9>  9</a>
+</span><span class=lnt id=hl-6-10><a class=lnlinks href=#hl-6-10> 10</a>
+</span><span class=lnt id=hl-6-11><a class=lnlinks href=#hl-6-11> 11</a>
+</span><span class=lnt id=hl-6-12><a class=lnlinks href=#hl-6-12> 12</a>
+</span><span class=lnt id=hl-6-13><a class=lnlinks href=#hl-6-13> 13</a>
+</span><span class=lnt id=hl-6-14><a class=lnlinks href=#hl-6-14> 14</a>
+</span><span class=lnt id=hl-6-15><a class=lnlinks href=#hl-6-15> 15</a>
+</span><span class=lnt id=hl-6-16><a class=lnlinks href=#hl-6-16> 16</a>
+</span><span class=lnt id=hl-6-17><a class=lnlinks href=#hl-6-17> 17</a>
+</span><span class=lnt id=hl-6-18><a class=lnlinks href=#hl-6-18> 18</a>
+</span><span class=lnt id=hl-6-19><a class=lnlinks href=#hl-6-19> 19</a>
+</span><span class=lnt id=hl-6-20><a class=lnlinks href=#hl-6-20> 20</a>
+</span><span class=lnt id=hl-6-21><a class=lnlinks href=#hl-6-21> 21</a>
+</span><span class=lnt id=hl-6-22><a class=lnlinks href=#hl-6-22> 22</a>
+</span><span class=lnt id=hl-6-23><a class=lnlinks href=#hl-6-23> 23</a>
+</span><span class=lnt id=hl-6-24><a class=lnlinks href=#hl-6-24> 24</a>
+</span><span class=lnt id=hl-6-25><a class=lnlinks href=#hl-6-25> 25</a>
+</span><span class=lnt id=hl-6-26><a class=lnlinks href=#hl-6-26> 26</a>
+</span><span class=lnt id=hl-6-27><a class=lnlinks href=#hl-6-27> 27</a>
+</span><span class=lnt id=hl-6-28><a class=lnlinks href=#hl-6-28> 28</a>
+</span><span class=lnt id=hl-6-29><a class=lnlinks href=#hl-6-29> 29</a>
+</span><span class=lnt id=hl-6-30><a class=lnlinks href=#hl-6-30> 30</a>
+</span><span class=lnt id=hl-6-31><a class=lnlinks href=#hl-6-31> 31</a>
+</span><span class=lnt id=hl-6-32><a class=lnlinks href=#hl-6-32> 32</a>
+</span><span class=lnt id=hl-6-33><a class=lnlinks href=#hl-6-33> 33</a>
+</span><span class=lnt id=hl-6-34><a class=lnlinks href=#hl-6-34> 34</a>
+</span><span class=lnt id=hl-6-35><a class=lnlinks href=#hl-6-35> 35</a>
+</span><span class=lnt id=hl-6-36><a class=lnlinks href=#hl-6-36> 36</a>
+</span><span class=lnt id=hl-6-37><a class=lnlinks href=#hl-6-37> 37</a>
+</span><span class=lnt id=hl-6-38><a class=lnlinks href=#hl-6-38> 38</a>
+</span><span class=lnt id=hl-6-39><a class=lnlinks href=#hl-6-39> 39</a>
+</span><span class=lnt id=hl-6-40><a class=lnlinks href=#hl-6-40> 40</a>
+</span><span class=lnt id=hl-6-41><a class=lnlinks href=#hl-6-41> 41</a>
+</span><span class=lnt id=hl-6-42><a class=lnlinks href=#hl-6-42> 42</a>
+</span><span class=lnt id=hl-6-43><a class=lnlinks href=#hl-6-43> 43</a>
+</span><span class=lnt id=hl-6-44><a class=lnlinks href=#hl-6-44> 44</a>
+</span><span class=lnt id=hl-6-45><a class=lnlinks href=#hl-6-45> 45</a>
+</span><span class=lnt id=hl-6-46><a class=lnlinks href=#hl-6-46> 46</a>
+</span><span class=lnt id=hl-6-47><a class=lnlinks href=#hl-6-47> 47</a>
+</span><span class=lnt id=hl-6-48><a class=lnlinks href=#hl-6-48> 48</a>
+</span><span class=lnt id=hl-6-49><a class=lnlinks href=#hl-6-49> 49</a>
+</span><span class=lnt id=hl-6-50><a class=lnlinks href=#hl-6-50> 50</a>
+</span><span class=lnt id=hl-6-51><a class=lnlinks href=#hl-6-51> 51</a>
+</span><span class=lnt id=hl-6-52><a class=lnlinks href=#hl-6-52> 52</a>
+</span><span class=lnt id=hl-6-53><a class=lnlinks href=#hl-6-53> 53</a>
+</span><span class=lnt id=hl-6-54><a class=lnlinks href=#hl-6-54> 54</a>
+</span><span class=lnt id=hl-6-55><a class=lnlinks href=#hl-6-55> 55</a>
+</span><span class=lnt id=hl-6-56><a class=lnlinks href=#hl-6-56> 56</a>
+</span><span class=lnt id=hl-6-57><a class=lnlinks href=#hl-6-57> 57</a>
+</span><span class=lnt id=hl-6-58><a class=lnlinks href=#hl-6-58> 58</a>
+</span><span class=lnt id=hl-6-59><a class=lnlinks href=#hl-6-59> 59</a>
+</span><span class=lnt id=hl-6-60><a class=lnlinks href=#hl-6-60> 60</a>
+</span><span class=lnt id=hl-6-61><a class=lnlinks href=#hl-6-61> 61</a>
+</span><span class=lnt id=hl-6-62><a class=lnlinks href=#hl-6-62> 62</a>
+</span><span class=lnt id=hl-6-63><a class=lnlinks href=#hl-6-63> 63</a>
+</span><span class=lnt id=hl-6-64><a class=lnlinks href=#hl-6-64> 64</a>
+</span><span class=lnt id=hl-6-65><a class=lnlinks href=#hl-6-65> 65</a>
+</span><span class=lnt id=hl-6-66><a class=lnlinks href=#hl-6-66> 66</a>
+</span><span class=lnt id=hl-6-67><a class=lnlinks href=#hl-6-67> 67</a>
+</span><span class=lnt id=hl-6-68><a class=lnlinks href=#hl-6-68> 68</a>
+</span><span class=lnt id=hl-6-69><a class=lnlinks href=#hl-6-69> 69</a>
+</span><span class=lnt id=hl-6-70><a class=lnlinks href=#hl-6-70> 70</a>
+</span><span class=lnt id=hl-6-71><a class=lnlinks href=#hl-6-71> 71</a>
+</span><span class=lnt id=hl-6-72><a class=lnlinks href=#hl-6-72> 72</a>
+</span><span class=lnt id=hl-6-73><a class=lnlinks href=#hl-6-73> 73</a>
+</span><span class=lnt id=hl-6-74><a class=lnlinks href=#hl-6-74> 74</a>
+</span><span class=lnt id=hl-6-75><a class=lnlinks href=#hl-6-75> 75</a>
+</span><span class=lnt id=hl-6-76><a class=lnlinks href=#hl-6-76> 76</a>
+</span><span class=lnt id=hl-6-77><a class=lnlinks href=#hl-6-77> 77</a>
+</span><span class=lnt id=hl-6-78><a class=lnlinks href=#hl-6-78> 78</a>
+</span><span class=lnt id=hl-6-79><a class=lnlinks href=#hl-6-79> 79</a>
+</span><span class=lnt id=hl-6-80><a class=lnlinks href=#hl-6-80> 80</a>
+</span><span class=lnt id=hl-6-81><a class=lnlinks href=#hl-6-81> 81</a>
+</span><span class=lnt id=hl-6-82><a class=lnlinks href=#hl-6-82> 82</a>
+</span><span class=lnt id=hl-6-83><a class=lnlinks href=#hl-6-83> 83</a>
+</span><span class=lnt id=hl-6-84><a class=lnlinks href=#hl-6-84> 84</a>
+</span><span class=lnt id=hl-6-85><a class=lnlinks href=#hl-6-85> 85</a>
+</span><span class=lnt id=hl-6-86><a class=lnlinks href=#hl-6-86> 86</a>
+</span><span class=lnt id=hl-6-87><a class=lnlinks href=#hl-6-87> 87</a>
+</span><span class=lnt id=hl-6-88><a class=lnlinks href=#hl-6-88> 88</a>
+</span><span class=lnt id=hl-6-89><a class=lnlinks href=#hl-6-89> 89</a>
+</span><span class=lnt id=hl-6-90><a class=lnlinks href=#hl-6-90> 90</a>
+</span><span class=lnt id=hl-6-91><a class=lnlinks href=#hl-6-91> 91</a>
+</span><span class=lnt id=hl-6-92><a class=lnlinks href=#hl-6-92> 92</a>
+</span><span class=lnt id=hl-6-93><a class=lnlinks href=#hl-6-93> 93</a>
+</span><span class=lnt id=hl-6-94><a class=lnlinks href=#hl-6-94> 94</a>
+</span><span class=lnt id=hl-6-95><a class=lnlinks href=#hl-6-95> 95</a>
+</span><span class=lnt id=hl-6-96><a class=lnlinks href=#hl-6-96> 96</a>
+</span><span class=lnt id=hl-6-97><a class=lnlinks href=#hl-6-97> 97</a>
+</span><span class=lnt id=hl-6-98><a class=lnlinks href=#hl-6-98> 98</a>
+</span><span class=lnt id=hl-6-99><a class=lnlinks href=#hl-6-99> 99</a>
+</span><span class=lnt id=hl-6-100><a class=lnlinks href=#hl-6-100>100</a>
+</span><span class=lnt id=hl-6-101><a class=lnlinks href=#hl-6-101>101</a>
+</span><span class=lnt id=hl-6-102><a class=lnlinks href=#hl-6-102>102</a>
+</span><span class=lnt id=hl-6-103><a class=lnlinks href=#hl-6-103>103</a>
+</span><span class=lnt id=hl-6-104><a class=lnlinks href=#hl-6-104>104</a>
+</span><span class=lnt id=hl-6-105><a class=lnlinks href=#hl-6-105>105</a>
+</span><span class=lnt id=hl-6-106><a class=lnlinks href=#hl-6-106>106</a>
+</span><span class=lnt id=hl-6-107><a class=lnlinks href=#hl-6-107>107</a>
+</span><span class=lnt id=hl-6-108><a class=lnlinks href=#hl-6-108>108</a>
+</span><span class=lnt id=hl-6-109><a class=lnlinks href=#hl-6-109>109</a>
+</span><span class=lnt id=hl-6-110><a class=lnlinks href=#hl-6-110>110</a>
+</span><span class=lnt id=hl-6-111><a class=lnlinks href=#hl-6-111>111</a>
+</span><span class=lnt id=hl-6-112><a class=lnlinks href=#hl-6-112>112</a>
+</span><span class=lnt id=hl-6-113><a class=lnlinks href=#hl-6-113>113</a>
+</span><span class=lnt id=hl-6-114><a class=lnlinks href=#hl-6-114>114</a>
+</span><span class=lnt id=hl-6-115><a class=lnlinks href=#hl-6-115>115</a>
+</span><span class=lnt id=hl-6-116><a class=lnlinks href=#hl-6-116>116</a>
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-lua data-lang=lua><span class=line><span class=cl><span class=c1>-- batch_insert_unnest.lua</span>
+</span></span><span class=line><span class=cl><span class=c1>-- Sysbench Lua script for pg batch INSERT benchmark using unnest().</span>
+</span></span><span class=line><span class=cl><span class=c1>-- Instead of a flat VALUES list, builds one array literal per column and uses:</span>
+</span></span><span class=line><span class=cl><span class=c1>--   INSERT … SELECT … FROM unnest(ARRAY[…]::type[], …) AS t(col, …)</span>
+</span></span><span class=line><span class=cl><span class=c1>-- This produces a single, fixed-shape query regardless of batch size, which</span>
+</span></span><span class=line><span class=cl><span class=c1>-- can benefit from plan caching and may reduce per-row parse overhead.</span>
+</span></span><span class=line><span class=cl><span class=c1>--</span>
+</span></span><span class=line><span class=cl><span class=c1>-- Accepts --batch-size=N on the CLI (passed via sysbench_options in mybench).</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>sysbench.cmdline</span><span class=p>.</span><span class=n>options</span> <span class=o>=</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=n>batch_size</span> <span class=o>=</span> <span class=p>{</span><span class=s2>&#34;Number of rows to INSERT per transaction&#34;</span><span class=p>,</span> <span class=mi>1</span><span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>local</span> <span class=n>CURRENCIES</span> <span class=o>=</span> <span class=p>{</span><span class=s2>&#34;USD&#34;</span><span class=p>,</span> <span class=s2>&#34;EUR&#34;</span><span class=p>,</span> <span class=s2>&#34;GBP&#34;</span><span class=p>,</span> <span class=s2>&#34;AUD&#34;</span><span class=p>,</span> <span class=s2>&#34;SGD&#34;</span><span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=kd>local</span> <span class=n>CHANNELS</span>   <span class=o>=</span> <span class=p>{</span><span class=s2>&#34;web&#34;</span><span class=p>,</span> <span class=s2>&#34;mobile&#34;</span><span class=p>,</span> <span class=s2>&#34;pos&#34;</span><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kr>function</span> <span class=nf>thread_init</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=n>drv</span> <span class=o>=</span> <span class=n>sysbench.sql</span><span class=p>.</span><span class=n>driver</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=n>con</span> <span class=o>=</span> <span class=n>drv</span><span class=p>:</span><span class=n>connect</span><span class=p>()</span>
+</span></span><span class=line><span class=cl><span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kr>function</span> <span class=nf>thread_done</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=n>con</span><span class=p>:</span><span class=n>disconnect</span><span class=p>()</span>
+</span></span><span class=line><span class=cl><span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kr>function</span> <span class=nf>event</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>batch_size</span> <span class=o>=</span> <span class=n>tonumber</span><span class=p>(</span><span class=n>sysbench.opt</span><span class=p>.</span><span class=n>batch_size</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- Per-column arrays (avoids one big table of tuples)</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>account_ids</span>   <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>merchant_ids</span>  <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>amounts</span>       <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>currencies</span>    <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>statuses</span>      <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>txn_types</span>     <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>descriptions</span>  <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>ip_addresses</span>  <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>device_ids</span>    <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>channels</span>      <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>attempts</span>      <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=kr>for</span> <span class=n>i</span> <span class=o>=</span> <span class=mi>1</span><span class=p>,</span> <span class=n>batch_size</span> <span class=kr>do</span>
+</span></span><span class=line><span class=cl>        <span class=n>account_ids</span><span class=p>[</span><span class=n>i</span><span class=p>]</span>  <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>100000</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>merchant_ids</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>10000</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>amounts</span><span class=p>[</span><span class=n>i</span><span class=p>]</span>      <span class=o>=</span> <span class=n>string.format</span><span class=p>(</span><span class=s2>&#34;%.2f&#34;</span><span class=p>,</span> <span class=n>math.floor</span><span class=p>(</span><span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>1000000</span><span class=p>))</span> <span class=o>/</span> <span class=mf>100.0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>currencies</span><span class=p>[</span><span class=n>i</span><span class=p>]</span>   <span class=o>=</span> <span class=n>CURRENCIES</span><span class=p>[</span><span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=o>#</span><span class=n>CURRENCIES</span><span class=p>)]</span>
+</span></span><span class=line><span class=cl>        <span class=n>statuses</span><span class=p>[</span><span class=n>i</span><span class=p>]</span>     <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>3</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>txn_types</span><span class=p>[</span><span class=n>i</span><span class=p>]</span>    <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>descriptions</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=o>=</span> <span class=s2>&#34;Payment ref-&#34;</span> <span class=o>..</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>1000000</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>ip_addresses</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>255</span><span class=p>)</span> <span class=o>..</span> <span class=s2>&#34;.&#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>                          <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>255</span><span class=p>)</span> <span class=o>..</span> <span class=s2>&#34;.&#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>                          <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>0</span><span class=p>,</span> <span class=mi>255</span><span class=p>)</span> <span class=o>..</span> <span class=s2>&#34;.&#34;</span> <span class=o>..</span>
+</span></span><span class=line><span class=cl>                          <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>254</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>device_ids</span><span class=p>[</span><span class=n>i</span><span class=p>]</span>   <span class=o>=</span> <span class=s2>&#34;device-&#34;</span> <span class=o>..</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>100000</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>channels</span><span class=p>[</span><span class=n>i</span><span class=p>]</span>     <span class=o>=</span> <span class=n>CHANNELS</span><span class=p>[</span><span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=o>#</span><span class=n>CHANNELS</span><span class=p>)]</span>
+</span></span><span class=line><span class=cl>        <span class=n>attempts</span><span class=p>[</span><span class=n>i</span><span class=p>]</span>     <span class=o>=</span> <span class=n>sysbench.rand</span><span class=p>.</span><span class=n>uniform</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span> <span class=mi>4</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- Build array literals for each column</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=kr>function</span> <span class=nf>int_array</span><span class=p>(</span><span class=n>t</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=kr>return</span> <span class=s2>&#34;ARRAY[&#34;</span> <span class=o>..</span> <span class=n>table.concat</span><span class=p>(</span><span class=n>t</span><span class=p>,</span> <span class=s2>&#34;,&#34;</span><span class=p>)</span> <span class=o>..</span> <span class=s2>&#34;]&#34;</span>
+</span></span><span class=line><span class=cl>    <span class=kr>end</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=kr>function</span> <span class=nf>quoted_array</span><span class=p>(</span><span class=n>t</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=kd>local</span> <span class=n>q</span> <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>        <span class=kr>for</span> <span class=n>i</span><span class=p>,</span> <span class=n>v</span> <span class=kr>in</span> <span class=n>ipairs</span><span class=p>(</span><span class=n>t</span><span class=p>)</span> <span class=kr>do</span> <span class=n>q</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=o>=</span> <span class=s2>&#34;&#39;&#34;</span> <span class=o>..</span> <span class=n>v</span> <span class=o>..</span> <span class=s2>&#34;&#39;&#34;</span> <span class=kr>end</span>
+</span></span><span class=line><span class=cl>        <span class=kr>return</span> <span class=s2>&#34;ARRAY[&#34;</span> <span class=o>..</span> <span class=n>table.concat</span><span class=p>(</span><span class=n>q</span><span class=p>,</span> <span class=s2>&#34;,&#34;</span><span class=p>)</span> <span class=o>..</span> <span class=s2>&#34;]&#34;</span>
+</span></span><span class=line><span class=cl>    <span class=kr>end</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=kr>function</span> <span class=nf>numeric_array</span><span class=p>(</span><span class=n>t</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=kr>return</span> <span class=s2>&#34;ARRAY[&#34;</span> <span class=o>..</span> <span class=n>table.concat</span><span class=p>(</span><span class=n>t</span><span class=p>,</span> <span class=s2>&#34;,&#34;</span><span class=p>)</span> <span class=o>..</span> <span class=s2>&#34;]&#34;</span>
+</span></span><span class=line><span class=cl>    <span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=c1>-- metadata is built from channels + attempts</span>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>metadata_arr</span> <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>    <span class=kr>for</span> <span class=n>i</span> <span class=o>=</span> <span class=mi>1</span><span class=p>,</span> <span class=n>batch_size</span> <span class=kr>do</span>
+</span></span><span class=line><span class=cl>        <span class=n>metadata_arr</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=o>=</span> <span class=n>string.format</span><span class=p>(</span><span class=s2>&#34;&#39;{</span><span class=se>\&#34;</span><span class=s2>channel</span><span class=se>\&#34;</span><span class=s2>:</span><span class=se>\&#34;</span><span class=s2>%s</span><span class=se>\&#34;</span><span class=s2>,</span><span class=se>\&#34;</span><span class=s2>attempt</span><span class=se>\&#34;</span><span class=s2>:%d}&#39;&#34;</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>            <span class=n>channels</span><span class=p>[</span><span class=n>i</span><span class=p>],</span> <span class=n>attempts</span><span class=p>[</span><span class=n>i</span><span class=p>])</span>
+</span></span><span class=line><span class=cl>    <span class=kr>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=kd>local</span> <span class=n>sql</span> <span class=o>=</span> <span class=n>string.format</span><span class=p>(</span><span class=s>[[
+</span></span></span><span class=line><span class=cl><span class=s>INSERT INTO transactions
+</span></span></span><span class=line><span class=cl><span class=s>    (account_id, merchant_id, amount, currency, status, type,
+</span></span></span><span class=line><span class=cl><span class=s>     reference_id, description, ip_address, device_id, metadata,
+</span></span></span><span class=line><span class=cl><span class=s>     created_at, updated_at)
+</span></span></span><span class=line><span class=cl><span class=s>SELECT
+</span></span></span><span class=line><span class=cl><span class=s>    a, m, n::numeric(12,2), c, s::smallint, tp::smallint,
+</span></span></span><span class=line><span class=cl><span class=s>    gen_random_uuid(), d, ip::inet, dev, meta::jsonb,
+</span></span></span><span class=line><span class=cl><span class=s>    clock_timestamp(), clock_timestamp()
+</span></span></span><span class=line><span class=cl><span class=s>FROM unnest(
+</span></span></span><span class=line><span class=cl><span class=s>    %s::bigint[],
+</span></span></span><span class=line><span class=cl><span class=s>    %s::bigint[],
+</span></span></span><span class=line><span class=cl><span class=s>    %s::numeric[],
+</span></span></span><span class=line><span class=cl><span class=s>    %s::text[],
+</span></span></span><span class=line><span class=cl><span class=s>    %s::int[],
+</span></span></span><span class=line><span class=cl><span class=s>    %s::int[],
+</span></span></span><span class=line><span class=cl><span class=s>    %s::text[],
+</span></span></span><span class=line><span class=cl><span class=s>    %s::text[],
+</span></span></span><span class=line><span class=cl><span class=s>    %s::text[],
+</span></span></span><span class=line><span class=cl><span class=s>    %s::jsonb[]
+</span></span></span><span class=line><span class=cl><span class=s>) AS t(a, m, n, c, s, tp, d, ip, dev, meta)]]</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>        <span class=n>int_array</span><span class=p>(</span><span class=n>account_ids</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>        <span class=n>int_array</span><span class=p>(</span><span class=n>merchant_ids</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>        <span class=n>numeric_array</span><span class=p>(</span><span class=n>amounts</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>        <span class=n>quoted_array</span><span class=p>(</span><span class=n>currencies</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>        <span class=n>int_array</span><span class=p>(</span><span class=n>statuses</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>        <span class=n>int_array</span><span class=p>(</span><span class=n>txn_types</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>        <span class=n>quoted_array</span><span class=p>(</span><span class=n>descriptions</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>        <span class=n>quoted_array</span><span class=p>(</span><span class=n>ip_addresses</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>        <span class=n>quoted_array</span><span class=p>(</span><span class=n>device_ids</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>        <span class=c1>-- jsonb array: elements are already single-quoted objects</span>
+</span></span><span class=line><span class=cl>        <span class=s2>&#34;ARRAY[&#34;</span> <span class=o>..</span> <span class=n>table.concat</span><span class=p>(</span><span class=n>metadata_arr</span><span class=p>,</span> <span class=s2>&#34;,&#34;</span><span class=p>)</span> <span class=o>..</span> <span class=s2>&#34;]&#34;</span>
+</span></span><span class=line><span class=cl>    <span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=n>con</span><span class=p>:</span><span class=n>query</span><span class=p>(</span><span class=s2>&#34;BEGIN&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>con</span><span class=p>:</span><span class=n>query</span><span class=p>(</span><span class=n>sql</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>    <span class=n>con</span><span class=p>:</span><span class=n>query</span><span class=p>(</span><span class=s2>&#34;COMMIT&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=kr>end</span>
+</span></span></code></pre></td></tr></table></div></div><h3 id=aas>AAS<a hidden class=anchor aria-hidden=true href=#aas>#</a></h3><h4 id=batch_1-1>batch_1<a hidden class=anchor aria-hidden=true href=#batch_1-1>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/4 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>25</td><td>1.39</td></tr><tr><td>IO</td><td>WalSync</td><td>9</td><td>1.00</td></tr></tbody></table><h4 id=batch_10-1>batch_10<a hidden class=anchor aria-hidden=true href=#batch_10-1>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/4 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>28</td><td>1.56</td></tr><tr><td>IO</td><td>WalSync</td><td>9</td><td>1.00</td></tr><tr><td>LWLock</td><td>WALWrite</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_50-1>batch_50<a hidden class=anchor aria-hidden=true href=#batch_50-1>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/4 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>24</td><td>1.33</td></tr><tr><td>IO</td><td>DataFileRead</td><td>11</td><td>1.57</td></tr><tr><td>IO</td><td>WalSync</td><td>7</td><td>1.00</td></tr><tr><td>LWLock</td><td>WALWrite</td><td>3</td><td>1.00</td></tr><tr><td>Timeout</td><td>VacuumDelay</td><td>3</td><td>1.00</td></tr><tr><td>Client</td><td>ClientRead</td><td>2</td><td>2.00</td></tr><tr><td>IO</td><td>WalInitWrite</td><td>2</td><td>1.00</td></tr><tr><td>IO</td><td>DataFileWrite</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_100-1>batch_100<a hidden class=anchor aria-hidden=true href=#batch_100-1>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/4 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>28</td><td>1.56</td></tr><tr><td>IO</td><td>DataFileRead</td><td>21</td><td>1.75</td></tr><tr><td>IO</td><td>WalSync</td><td>5</td><td>1.00</td></tr><tr><td>Timeout</td><td>VacuumDelay</td><td>3</td><td>1.00</td></tr><tr><td>LWLock</td><td>WALWrite</td><td>2</td><td>1.00</td></tr></tbody></table><h4 id=batch_500-1>batch_500<a hidden class=anchor aria-hidden=true href=#batch_500-1>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/4 vCPU)</th></tr></thead><tbody><tr><td>IO</td><td>DataFileRead</td><td>29</td><td>1.93</td></tr><tr><td>CPU</td><td>running</td><td>23</td><td>1.28</td></tr><tr><td>Timeout</td><td>VacuumDelay</td><td>6</td><td>1.00</td></tr><tr><td>Client</td><td>ClientRead</td><td>2</td><td>1.00</td></tr><tr><td>IO</td><td>DataFilePrefetch</td><td>2</td><td>1.00</td></tr><tr><td>IO</td><td>WalSync</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_1000-1>batch_1000<a hidden class=anchor aria-hidden=true href=#batch_1000-1>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/4 vCPU)</th></tr></thead><tbody><tr><td>IO</td><td>DataFileRead</td><td>27</td><td>1.80</td></tr><tr><td>CPU</td><td>running</td><td>26</td><td>1.44</td></tr><tr><td>Timeout</td><td>VacuumDelay</td><td>4</td><td>1.00</td></tr><tr><td>IO</td><td>WalSync</td><td>3</td><td>1.00</td></tr><tr><td>IO</td><td>DataFilePrefetch</td><td>1</td><td>1.00</td></tr><tr><td>IO</td><td>DataFileWrite</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_2000-1>batch_2000<a hidden class=anchor aria-hidden=true href=#batch_2000-1>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/4 vCPU)</th></tr></thead><tbody><tr><td>IO</td><td>DataFileRead</td><td>30</td><td>2.00</td></tr><tr><td>CPU</td><td>running</td><td>26</td><td>1.44</td></tr><tr><td>Timeout</td><td>VacuumDelay</td><td>5</td><td>1.00</td></tr><tr><td>LWLock</td><td>BufferContent</td><td>2</td><td>1.00</td></tr><tr><td>IO</td><td>WalSync</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_5000-1>batch_5000<a hidden class=anchor aria-hidden=true href=#batch_5000-1>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/4 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>29</td><td>1.53</td></tr><tr><td>IO</td><td>DataFileRead</td><td>28</td><td>2.00</td></tr><tr><td>Client</td><td>ClientRead</td><td>2</td><td>1.00</td></tr><tr><td>IO</td><td>WalWrite</td><td>1</td><td>1.00</td></tr></tbody></table><h4 id=batch_10000-1>batch_10000<a hidden class=anchor aria-hidden=true href=#batch_10000-1>#</a></h4><table><thead><tr><th>Wait Type</th><th>Wait Event</th><th>Count</th><th>Load (AAS/4 vCPU)</th></tr></thead><tbody><tr><td>CPU</td><td>running</td><td>78</td><td>3.71</td></tr><tr><td>Client</td><td>ClientRead</td><td>3</td><td>1.00</td></tr></tbody></table></div><footer class=post-footer><ul class=post-tags></ul><nav class=paginav><a class=prev href=http://localhost:1313/posts/postgres-internal-insert-wait/><span class=title>« Prev</span><br><span>Postgres Internal Insert Wait</span>
+</a><a class=next href=http://localhost:1313/posts/postgres-how-many-connection-to-open-benchmark/><span class=title>Next »</span><br><span>Postgres: How Many Connections to Open? Benchmark</span></a></nav><ul class=share-buttons><li><a target=_blank rel="noopener noreferrer" aria-label="share Postgres Batch Insert Benchmark on x" href="https://x.com/intent/tweet/?text=Postgres%20Batch%20Insert%20Benchmark&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fpostgres-batch-insert-benchmark%2f&amp;hashtags="><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M512 62.554V449.446C512 483.97 483.97 512 449.446 512H62.554C28.03 512 0 483.97.0 449.446V62.554C0 28.03 28.029.0 62.554.0H449.446C483.971.0 512 28.03 512 62.554zM269.951 190.75 182.567 75.216H56L207.216 272.95 63.9 436.783h61.366L235.9 310.383l96.667 126.4H456L298.367 228.367l134-153.151H371.033zM127.633 110h36.468l219.38 290.065H349.5z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Postgres Batch Insert Benchmark on linkedin" href="https://www.linkedin.com/shareArticle?mini=true&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fpostgres-batch-insert-benchmark%2f&amp;title=Postgres%20Batch%20Insert%20Benchmark&amp;summary=Postgres%20Batch%20Insert%20Benchmark&amp;source=http%3a%2f%2flocalhost%3a1313%2fposts%2fpostgres-batch-insert-benchmark%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zM160.461 423.278V197.561h-75.04v225.717h75.04zm270.539.0V293.839c0-69.333-37.018-101.586-86.381-101.586-39.804.0-57.634 21.891-67.617 37.266v-31.958h-75.021c.995 21.181.0 225.717.0 225.717h75.02V297.222c0-6.748.486-13.492 2.474-18.315 5.414-13.475 17.767-27.434 38.494-27.434 27.135.0 38.007 20.707 38.007 51.037v120.768H431zM123.448 88.722C97.774 88.722 81 105.601 81 127.724c0 21.658 16.264 39.002 41.455 39.002h.484c26.165.0 42.452-17.344 42.452-39.002-.485-22.092-16.241-38.954-41.943-39.002z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Postgres Batch Insert Benchmark on reddit" href="https://reddit.com/submit?url=http%3a%2f%2flocalhost%3a1313%2fposts%2fpostgres-batch-insert-benchmark%2f&title=Postgres%20Batch%20Insert%20Benchmark"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zM446 265.638c0-22.964-18.616-41.58-41.58-41.58-11.211.0-21.361 4.457-28.841 11.666-28.424-20.508-67.586-33.757-111.204-35.278l18.941-89.121 61.884 13.157c.756 15.734 13.642 28.29 29.56 28.29 16.407.0 29.706-13.299 29.706-29.701.0-16.403-13.299-29.702-29.706-29.702-11.666.0-21.657 6.792-26.515 16.578l-69.105-14.69c-1.922-.418-3.939-.042-5.585 1.036-1.658 1.073-2.811 2.761-3.224 4.686l-21.152 99.438c-44.258 1.228-84.046 14.494-112.837 35.232-7.468-7.164-17.589-11.591-28.757-11.591-22.965.0-41.585 18.616-41.585 41.58.0 16.896 10.095 31.41 24.568 37.918-.639 4.135-.99 8.328-.99 12.576.0 63.977 74.469 115.836 166.33 115.836s166.334-51.859 166.334-115.836c0-4.218-.347-8.387-.977-12.493 14.564-6.47 24.735-21.034 24.735-38.001zM326.526 373.831c-20.27 20.241-59.115 21.816-70.534 21.816-11.428.0-50.277-1.575-70.522-21.82-3.007-3.008-3.007-7.882.0-10.889 3.003-2.999 7.882-3.003 10.885.0 12.777 12.781 40.11 17.317 59.637 17.317 19.522.0 46.86-4.536 59.657-17.321 3.016-2.999 7.886-2.995 10.885.008 3.008 3.011 3.003 7.882-.008 10.889zm-5.23-48.781c-16.373.0-29.701-13.324-29.701-29.698.0-16.381 13.328-29.714 29.701-29.714 16.378.0 29.706 13.333 29.706 29.714.0 16.374-13.328 29.698-29.706 29.698zM160.91 295.348c0-16.381 13.328-29.71 29.714-29.71 16.369.0 29.689 13.329 29.689 29.71.0 16.373-13.32 29.693-29.689 29.693-16.386.0-29.714-13.32-29.714-29.693z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Postgres Batch Insert Benchmark on facebook" href="https://facebook.com/sharer/sharer.php?u=http%3a%2f%2flocalhost%3a1313%2fposts%2fpostgres-batch-insert-benchmark%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H342.978V319.085h66.6l12.672-82.621h-79.272v-53.617c0-22.603 11.073-44.636 46.58-44.636H425.6v-70.34s-32.71-5.582-63.982-5.582c-65.288.0-107.96 39.569-107.96 111.204v62.971h-72.573v82.621h72.573V512h-191.104c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Postgres Batch Insert Benchmark on whatsapp" href="https://api.whatsapp.com/send?text=Postgres%20Batch%20Insert%20Benchmark%20-%20http%3a%2f%2flocalhost%3a1313%2fposts%2fpostgres-batch-insert-benchmark%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zm-58.673 127.703c-33.842-33.881-78.847-52.548-126.798-52.568-98.799.0-179.21 80.405-179.249 179.234-.013 31.593 8.241 62.428 23.927 89.612l-25.429 92.884 95.021-24.925c26.181 14.28 55.659 21.807 85.658 21.816h.074c98.789.0 179.206-80.413 179.247-179.243.018-47.895-18.61-92.93-52.451-126.81zM263.976 403.485h-.06c-26.734-.01-52.954-7.193-75.828-20.767l-5.441-3.229-56.386 14.792 15.05-54.977-3.542-5.637c-14.913-23.72-22.791-51.136-22.779-79.287.033-82.142 66.867-148.971 149.046-148.971 39.793.014 77.199 15.531 105.329 43.692 28.128 28.16 43.609 65.592 43.594 105.4-.034 82.149-66.866 148.983-148.983 148.984zm81.721-111.581c-4.479-2.242-26.499-13.075-30.604-14.571-4.105-1.495-7.091-2.241-10.077 2.241-2.986 4.483-11.569 14.572-14.182 17.562-2.612 2.988-5.225 3.364-9.703 1.12-4.479-2.241-18.91-6.97-36.017-22.23C231.8 264.15 222.81 249.484 220.198 245s-.279-6.908 1.963-9.14c2.016-2.007 4.48-5.232 6.719-7.847 2.24-2.615 2.986-4.484 4.479-7.472 1.493-2.99.747-5.604-.374-7.846-1.119-2.241-10.077-24.288-13.809-33.256-3.635-8.733-7.327-7.55-10.077-7.688-2.609-.13-5.598-.158-8.583-.158-2.986.0-7.839 1.121-11.944 5.604-4.105 4.484-15.675 15.32-15.675 37.364.0 22.046 16.048 43.342 18.287 46.332 2.24 2.99 31.582 48.227 76.511 67.627 10.685 4.615 19.028 7.371 25.533 9.434 10.728 3.41 20.492 2.929 28.209 1.775 8.605-1.285 26.499-10.833 30.231-21.295 3.732-10.464 3.732-19.431 2.612-21.298-1.119-1.869-4.105-2.99-8.583-5.232z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Postgres Batch Insert Benchmark on telegram" href="https://telegram.me/share/url?text=Postgres%20Batch%20Insert%20Benchmark&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fpostgres-batch-insert-benchmark%2f"><svg viewBox="2 2 28 28" height="30" width="30" fill="currentColor"><path d="M26.49 29.86H5.5a3.37 3.37.0 01-2.47-1 3.35 3.35.0 01-1-2.47V5.48A3.36 3.36.0 013 3 3.37 3.37.0 015.5 2h21A3.38 3.38.0 0129 3a3.36 3.36.0 011 2.46V26.37a3.35 3.35.0 01-1 2.47 3.38 3.38.0 01-2.51 1.02zm-5.38-6.71a.79.79.0 00.85-.66L24.73 9.24a.55.55.0 00-.18-.46.62.62.0 00-.41-.17q-.08.0-16.53 6.11a.59.59.0 00-.41.59.57.57.0 00.43.52l4 1.24 1.61 4.83a.62.62.0 00.63.43.56.56.0 00.4-.17L16.54 20l4.09 3A.9.9.0 0021.11 23.15zM13.8 20.71l-1.21-4q8.72-5.55 8.78-5.55c.15.0.23.0.23.16a.18.18.0 010 .06s-2.51 2.3-7.52 6.8z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Postgres Batch Insert Benchmark on ycombinator" href="https://news.ycombinator.com/submitlink?t=Postgres%20Batch%20Insert%20Benchmark&u=http%3a%2f%2flocalhost%3a1313%2fposts%2fpostgres-batch-insert-benchmark%2f"><svg width="30" height="30" viewBox="0 0 512 512" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554V449.446C512 483.97 483.97 512 449.446 512H62.554C28.03 512 0 483.97.0 449.446V62.554C0 28.03 28.029.0 62.554.0H449.446zM183.8767 87.9921h-62.034L230.6673 292.4508V424.0079h50.6655V292.4508L390.1575 87.9921H328.1233L256 238.2489z"/></svg></a></li></ul></footer><div id=disqus_thread></div><script>window.disqus_config=function(){},function(){if(["localhost","127.0.0.1"].indexOf(window.location.hostname)!=-1){document.getElementById("disqus_thread").innerHTML="Disqus comments not available by default when the website is previewed locally.";return}var t=document,e=t.createElement("script");e.async=!0,e.src="//khanh1998.disqus.com/embed.js",e.setAttribute("data-timestamp",+new Date),(t.head||t.body).appendChild(e)}()</script><noscript>Please enable JavaScript to view the <a href=https://disqus.com/?ref_noscript>comments powered by Disqus.</a></noscript><a href=https://disqus.com class=dsq-brlink>comments powered by <span class=logo-disqus>Disqus</span></a></article></main><footer class=footer><span>&copy; 2026 <a href=http://localhost:1313/>Khanh1998</a></span> ·
+<span>Powered by
+<a href=https://gohugo.io/ rel="noopener noreferrer" target=_blank>Hugo</a> &
+<a href=https://github.com/adityatelange/hugo-PaperMod/ rel=noopener target=_blank>PaperMod</a></span></footer><a href=#top aria-label="go to top" title="Go to Top (Alt + G)" class=top-link id=top-link accesskey=g><svg viewBox="0 0 12 6" fill="currentColor"><path d="M12 6H0l6-6z"/></svg>
+</a><script>let menu=document.getElementById("menu");menu&&(menu.scrollLeft=localStorage.getItem("menu-scroll-position"),menu.onscroll=function(){localStorage.setItem("menu-scroll-position",menu.scrollLeft)}),document.querySelectorAll('a[href^="#"]').forEach(e=>{e.addEventListener("click",function(e){e.preventDefault();var t=this.getAttribute("href").substr(1);window.matchMedia("(prefers-reduced-motion: reduce)").matches?document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView():document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView({behavior:"smooth"}),t==="top"?history.replaceState(null,null," "):history.pushState(null,null,`#${t}`)})})</script><script>var mybutton=document.getElementById("top-link");window.onscroll=function(){document.body.scrollTop>800||document.documentElement.scrollTop>800?(mybutton.style.visibility="visible",mybutton.style.opacity="1"):(mybutton.style.visibility="hidden",mybutton.style.opacity="0")}</script><script>document.getElementById("theme-toggle").addEventListener("click",()=>{document.body.className.includes("dark")?(document.body.classList.remove("dark"),localStorage.setItem("pref-theme","light")):(document.body.classList.add("dark"),localStorage.setItem("pref-theme","dark"))})</script><script>document.querySelectorAll("pre > code").forEach(e=>{const n=e.parentNode.parentNode,t=document.createElement("button");t.classList.add("copy-code"),t.innerHTML="copy";function s(){t.innerHTML="copied!",setTimeout(()=>{t.innerHTML="copy"},2e3)}t.addEventListener("click",t=>{if("clipboard"in navigator){navigator.clipboard.writeText(e.textContent),s();return}const n=document.createRange();n.selectNodeContents(e);const o=window.getSelection();o.removeAllRanges(),o.addRange(n);try{document.execCommand("copy"),s()}catch{}o.removeRange(n)}),n.classList.contains("highlight")?n.appendChild(t):n.parentNode.firstChild==n||(e.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName=="TABLE"?e.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(t):e.parentNode.appendChild(t))})</script></body></html>

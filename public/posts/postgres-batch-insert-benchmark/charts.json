@@ -1,0 +1,798 @@
+{
+  "transactions_latency": {
+    "type": "line",
+    "data": {
+      "labels": [
+        "batch_1",
+        "batch_10",
+        "batch_50",
+        "batch_100",
+        "batch_500",
+        "batch_1000",
+        "batch_2000",
+        "batch_5000",
+        "batch_10000"
+      ],
+      "datasets": [
+        {
+          "label": "Rows Inserted",
+          "data": [
+            90981,
+            741870,
+            1791250,
+            2204800,
+            2150500,
+            1656000,
+            1350000,
+            925000,
+            550000
+          ],
+          "yAxisID": "y",
+          "borderColor": "#2563eb",
+          "backgroundColor": "rgba(37, 99, 235, 0.12)",
+          "tension": 0.35,
+          "fill": true,
+          "borderWidth": 2
+        },
+        {
+          "label": "Avg Latency (ms)",
+          "data": [
+            3.95,
+            4.85,
+            10.05,
+            16.33,
+            83.7,
+            222.31,
+            560.33,
+            1982.84,
+            7135.48
+          ],
+          "yAxisID": "y1",
+          "borderColor": "#dc2626",
+          "backgroundColor": "rgba(220, 38, 38, 0.12)",
+          "tension": 0.35,
+          "fill": true,
+          "borderWidth": 2
+        }
+      ]
+    },
+    "options": {
+      "responsive": true,
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "scales": {
+        "y": {
+          "type": "linear",
+          "display": true,
+          "position": "left",
+          "title": {
+            "display": true,
+            "text": "Rows Inserted"
+          }
+        },
+        "y1": {
+          "type": "linear",
+          "display": true,
+          "position": "right",
+          "title": {
+            "display": true,
+            "text": "Avg Latency (ms)"
+          },
+          "grid": {
+            "drawOnChartArea": false
+          }
+        }
+      }
+    }
+  },
+  "unnest_rows_latency": {
+    "type": "line",
+    "data": {
+      "labels": [
+        "batch_1",
+        "batch_10",
+        "batch_50",
+        "batch_100",
+        "batch_500",
+        "batch_1000",
+        "batch_2000",
+        "batch_5000",
+        "batch_10000"
+      ],
+      "datasets": [
+        {
+          "label": "Rows Inserted",
+          "data": [
+            85296,
+            758920,
+            2009350,
+            2134600,
+            2204500,
+            2200000,
+            2182000,
+            2030000,
+            780000
+          ],
+          "yAxisID": "y",
+          "borderColor": "#2563eb",
+          "backgroundColor": "rgba(37, 99, 235, 0.12)",
+          "tension": 0.35,
+          "fill": true,
+          "borderWidth": 2
+        },
+        {
+          "label": "Avg Latency (ms)",
+          "data": [
+            4.22,
+            4.74,
+            8.96,
+            16.86,
+            81.73,
+            163.95,
+            330.71,
+            891.89,
+            5229.24
+          ],
+          "yAxisID": "y1",
+          "borderColor": "#dc2626",
+          "backgroundColor": "rgba(220, 38, 38, 0.12)",
+          "tension": 0.35,
+          "fill": true,
+          "borderWidth": 2
+        }
+      ]
+    },
+    "options": {
+      "responsive": true,
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "scales": {
+        "y": {
+          "type": "linear",
+          "display": true,
+          "position": "left",
+          "title": {
+            "display": true,
+            "text": "Rows Inserted"
+          }
+        },
+        "y1": {
+          "type": "linear",
+          "display": true,
+          "position": "right",
+          "title": {
+            "display": true,
+            "text": "Avg Latency (ms)"
+          },
+          "grid": {
+            "drawOnChartArea": false
+          }
+        }
+      }
+    }
+  },
+  "unnest_latency_p95": {
+    "type": "line",
+    "data": {
+      "labels": [
+        "batch_1",
+        "batch_10",
+        "batch_50",
+        "batch_100",
+        "batch_500",
+        "batch_1000",
+        "batch_2000",
+        "batch_5000",
+        "batch_10000"
+      ],
+      "datasets": [
+        {
+          "label": "Avg Latency (ms)",
+          "data": [
+            4.22,
+            4.74,
+            8.96,
+            16.86,
+            81.73,
+            163.95,
+            330.71,
+            891.89,
+            5229.24
+          ],
+          "borderColor": "#ea580c",
+          "backgroundColor": "rgba(234, 88, 12, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        },
+        {
+          "label": "p95 Latency (ms)",
+          "data": [
+            4.91,
+            5.77,
+            16.12,
+            38.94,
+            383.33,
+            669.89,
+            1235.62,
+            2828.87,
+            21255.35
+          ],
+          "borderColor": "#7c3aed",
+          "backgroundColor": "rgba(124, 58, 237, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        }
+      ]
+    },
+    "options": {
+      "responsive": true,
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "scales": {
+        "y": {
+          "beginAtZero": true,
+          "title": {
+            "display": true,
+            "text": "Latency (ms)"
+          }
+        },
+        "x": {
+          "title": {
+            "display": true,
+            "text": "Batch Size"
+          }
+        }
+      }
+    }
+  },
+  "latency_p95": {
+    "type": "line",
+    "data": {
+      "labels": [
+        "batch_1",
+        "batch_10",
+        "batch_50",
+        "batch_100",
+        "batch_500",
+        "batch_1000",
+        "batch_2000",
+        "batch_5000",
+        "batch_10000"
+      ],
+      "datasets": [
+        {
+          "label": "Avg Latency (ms)",
+          "data": [
+            3.95,
+            4.85,
+            10.05,
+            16.33,
+            83.7,
+            222.31,
+            560.33,
+            1982.84,
+            7135.48
+          ],
+          "borderColor": "#ea580c",
+          "backgroundColor": "rgba(234, 88, 12, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        },
+        {
+          "label": "p95 Latency (ms)",
+          "data": [
+            4.25,
+            5.57,
+            11.24,
+            19.29,
+            164.45,
+            669.89,
+            1903.57,
+            6835.96,
+            22034.77
+          ],
+          "borderColor": "#7c3aed",
+          "backgroundColor": "rgba(124, 58, 237, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        }
+      ]
+    },
+    "options": {
+      "responsive": true,
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "scales": {
+        "y": {
+          "beginAtZero": true,
+          "title": {
+            "display": true,
+            "text": "Latency (ms)"
+          }
+        },
+        "x": {
+          "title": {
+            "display": true,
+            "text": "Batch Size"
+          }
+        }
+      }
+    }
+  },
+  "compare_rows_inserted": {
+    "type": "line",
+    "data": {
+      "labels": [
+        "batch_1",
+        "batch_10",
+        "batch_50",
+        "batch_100",
+        "batch_500",
+        "batch_1000",
+        "batch_2000",
+        "batch_5000",
+        "batch_10000"
+      ],
+      "datasets": [
+        {
+          "label": "VALUES insert",
+          "data": [
+            90981,
+            741870,
+            1791250,
+            2204800,
+            2150500,
+            1656000,
+            1350000,
+            925000,
+            550000
+          ],
+          "borderColor": "#2563eb",
+          "backgroundColor": "rgba(37, 99, 235, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        },
+        {
+          "label": "Unnest insert",
+          "data": [
+            85296,
+            758920,
+            2009350,
+            2134600,
+            2204500,
+            2200000,
+            2182000,
+            2030000,
+            780000
+          ],
+          "borderColor": "#16a34a",
+          "backgroundColor": "rgba(22, 163, 74, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        }
+      ]
+    },
+    "options": {
+      "responsive": true,
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "scales": {
+        "y": {
+          "beginAtZero": true,
+          "title": {
+            "display": true,
+            "text": "Rows Inserted"
+          }
+        },
+        "x": {
+          "title": {
+            "display": true,
+            "text": "Batch Size"
+          }
+        }
+      }
+    }
+  },
+  "unnest_iops": {
+    "type": "line",
+    "data": {
+      "labels": [
+        "batch_1",
+        "batch_10",
+        "batch_50",
+        "batch_100",
+        "batch_500",
+        "batch_1000",
+        "batch_2000",
+        "batch_5000",
+        "batch_10000"
+      ],
+      "datasets": [
+        {
+          "label": "Write IOPS",
+          "data": [
+            9.60,
+            10.55,
+            11.93,
+            17.85,
+            17.28,
+            16.68,
+            22.30,
+            68.91,
+            42.59
+          ],
+          "yAxisID": "y",
+          "borderColor": "#dc2626",
+          "backgroundColor": "rgba(220, 38, 38, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        },
+        {
+          "label": "Read IOPS",
+          "data": [
+            5.25,
+            76.90,
+            198.48,
+            289.02,
+            322.38,
+            307.72,
+            470.20,
+            2400,
+            2400
+          ],
+          "yAxisID": "y1",
+          "borderColor": "#2563eb",
+          "backgroundColor": "rgba(37, 99, 235, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        }
+      ]
+    },
+    "options": {
+      "responsive": true,
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "scales": {
+        "y": {
+          "type": "linear",
+          "display": true,
+          "position": "left",
+          "beginAtZero": true,
+          "title": {
+            "display": true,
+            "text": "Write IOPS"
+          }
+        },
+        "y1": {
+          "type": "linear",
+          "display": true,
+          "position": "right",
+          "beginAtZero": true,
+          "title": {
+            "display": true,
+            "text": "Read IOPS"
+          },
+          "grid": {
+            "drawOnChartArea": false
+          }
+        },
+        "x": {
+          "title": {
+            "display": true,
+            "text": "Batch Size"
+          }
+        }
+      }
+    }
+  },
+  "unnest_disk": {
+    "type": "line",
+    "data": {
+      "labels": [
+        "batch_1",
+        "batch_10",
+        "batch_50",
+        "batch_100",
+        "batch_500",
+        "batch_1000",
+        "batch_2000",
+        "batch_5000",
+        "batch_10000"
+      ],
+      "datasets": [
+        {
+          "label": "Disk Queue Length",
+          "data": [
+            0.01,
+            0.06,
+            0.15,
+            0.22,
+            0.25,
+            0.24,
+            0.36,
+            12.83,
+            19.48
+          ],
+          "yAxisID": "y",
+          "borderColor": "#7c3aed",
+          "backgroundColor": "rgba(124, 58, 237, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        },
+        {
+          "label": "Await (ms)",
+          "data": [
+            0.84,
+            0.72,
+            0.72,
+            0.72,
+            0.73,
+            0.73,
+            0.74,
+            5.22,
+            7.99
+          ],
+          "yAxisID": "y1",
+          "borderColor": "#ea580c",
+          "backgroundColor": "rgba(234, 88, 12, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        }
+      ]
+    },
+    "options": {
+      "responsive": true,
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "scales": {
+        "y": {
+          "type": "linear",
+          "display": true,
+          "position": "left",
+          "beginAtZero": true,
+          "title": {
+            "display": true,
+            "text": "Disk Queue Length"
+          }
+        },
+        "y1": {
+          "type": "linear",
+          "display": true,
+          "position": "right",
+          "beginAtZero": true,
+          "title": {
+            "display": true,
+            "text": "Await (ms)"
+          },
+          "grid": {
+            "drawOnChartArea": false
+          }
+        },
+        "x": {
+          "title": {
+            "display": true,
+            "text": "Batch Size"
+          }
+        }
+      }
+    }
+  },
+  "unnest_cpu": {
+    "type": "line",
+    "data": {
+      "labels": [
+        "batch_1",
+        "batch_10",
+        "batch_50",
+        "batch_100",
+        "batch_500",
+        "batch_1000",
+        "batch_2000",
+        "batch_5000",
+        "batch_10000"
+      ],
+      "datasets": [
+        {
+          "label": "Total CPU%",
+          "data": [
+            42.90,
+            51.60,
+            62.50,
+            71.70,
+            91.60,
+            94.40,
+            95.50,
+            99.30,
+            99.80
+          ],
+          "borderColor": "#2563eb",
+          "backgroundColor": "rgba(37, 99, 235, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        },
+        {
+          "label": "User CPU%",
+          "data": [
+            1.90,
+            2.40,
+            3.20,
+            3.50,
+            3.90,
+            4.30,
+            4.40,
+            13.70,
+            2.70
+          ],
+          "borderColor": "#16a34a",
+          "backgroundColor": "rgba(22, 163, 74, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        },
+        {
+          "label": "System CPU%",
+          "data": [
+            4.80,
+            6.40,
+            8.60,
+            9.60,
+            11.10,
+            10.60,
+            10.90,
+            20.50,
+            15.50
+          ],
+          "borderColor": "#ea580c",
+          "backgroundColor": "rgba(234, 88, 12, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        },
+        {
+          "label": "Wait CPU%",
+          "data": [
+            21.10,
+            22.00,
+            16.50,
+            16.10,
+            34.30,
+            37.00,
+            36.00,
+            48.50,
+            74.90
+          ],
+          "borderColor": "#dc2626",
+          "backgroundColor": "rgba(220, 38, 38, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        }
+      ]
+    },
+    "options": {
+      "responsive": true,
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "scales": {
+        "y": {
+          "beginAtZero": true,
+          "title": {
+            "display": true,
+            "text": "CPU%"
+          }
+        },
+        "x": {
+          "title": {
+            "display": true,
+            "text": "Batch Size"
+          }
+        }
+      }
+    }
+  },
+  "compare_avg_latency": {
+    "type": "line",
+    "data": {
+      "labels": [
+        "batch_1",
+        "batch_10",
+        "batch_50",
+        "batch_100",
+        "batch_500",
+        "batch_1000",
+        "batch_2000",
+        "batch_5000",
+        "batch_10000"
+      ],
+      "datasets": [
+        {
+          "label": "VALUES insert",
+          "data": [
+            3.95,
+            4.85,
+            10.05,
+            16.33,
+            83.7,
+            222.31,
+            560.33,
+            1982.84,
+            7135.48
+          ],
+          "borderColor": "#2563eb",
+          "backgroundColor": "rgba(37, 99, 235, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        },
+        {
+          "label": "Unnest insert",
+          "data": [
+            4.22,
+            4.74,
+            8.96,
+            16.86,
+            81.73,
+            163.95,
+            330.71,
+            891.89,
+            5229.24
+          ],
+          "borderColor": "#16a34a",
+          "backgroundColor": "rgba(22, 163, 74, 0.12)",
+          "tension": 0.35,
+          "fill": false,
+          "borderWidth": 2
+        }
+      ]
+    },
+    "options": {
+      "responsive": true,
+      "interaction": {
+        "mode": "index",
+        "intersect": false
+      },
+      "scales": {
+        "y": {
+          "beginAtZero": true,
+          "title": {
+            "display": true,
+            "text": "Avg Latency (ms)"
+          }
+        },
+        "x": {
+          "title": {
+            "display": true,
+            "text": "Batch Size"
+          }
+        }
+      }
+    }
+  }
+}

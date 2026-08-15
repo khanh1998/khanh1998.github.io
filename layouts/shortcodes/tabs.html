@@ -1,0 +1,85 @@
+{{- $id := .Get "id" | default (printf "tabs-%d" .Ordinal) -}}
+{{- $uid := printf "%s-%d" $id .Ordinal -}}
+{{- $parts := split .Inner "---tab " -}}
+{{- $tabs := slice -}}
+{{- range $index, $part := $parts -}}
+  {{- if gt $index 0 -}}
+    {{- $header := trim (index (split $part "---") 0) " \n\r\t" -}}
+    {{- $headerParts := split $header "|" -}}
+    {{- $label := trim (index $headerParts 0) " \n\r\t" -}}
+    {{- $chartId := "" -}}
+    {{- if ge (len $headerParts) 2 -}}
+      {{- $chartId = trim (index $headerParts 1) " \n\r\t" -}}
+      {{- if in (slice "no_chart" "none" "-") $chartId -}}
+        {{- $chartId = "" -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $content := replaceRE "(?s)^.*?---\\s*" "" $part -}}
+    {{- $tabs = $tabs | append (dict "label" $label "chartId" $chartId "content" $content) -}}
+  {{- end -}}
+{{- end -}}
+
+<div class="content-tabs" data-tabs="{{ $uid }}">
+  <div class="content-tabs__list" role="tablist" aria-label="{{ $id }}">
+    {{- range $index, $tab := $tabs }}
+      {{- $tabId := printf "%s-tab-%d" $uid $index -}}
+      {{- $panelId := printf "%s-panel-%d" $uid $index -}}
+      <button
+        class="content-tabs__tab{{ if eq $index 0 }} is-active{{ end }}"
+        type="button"
+        role="tab"
+        id="{{ $tabId }}"
+        aria-controls="{{ $panelId }}"
+        aria-selected="{{ if eq $index 0 }}true{{ else }}false{{ end }}"
+        data-tab="{{ $index }}"
+      >
+        {{ $tab.label }}
+      </button>
+    {{- end }}
+  </div>
+
+  {{- range $index, $tab := $tabs }}
+    {{- $tabId := printf "%s-tab-%d" $uid $index -}}
+    {{- $panelId := printf "%s-panel-%d" $uid $index -}}
+    <div
+      class="content-tabs__panel{{ if eq $index 0 }} is-active{{ end }}"
+      role="tabpanel"
+      id="{{ $panelId }}"
+      aria-labelledby="{{ $tabId }}"
+      {{ if ne $index 0 }}hidden{{ end }}
+    >
+      {{- with $tab.chartId -}}
+        {{- partial "render-chart.html" (dict "page" $.Page "site" $.Site "chartId" .) -}}
+      {{- end -}}
+      {{ $.Page.RenderString (dict "display" "block") $tab.content }}
+    </div>
+  {{- end }}
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const tabs = document.querySelector('[data-tabs="{{ $uid }}"]');
+    if (!tabs) return;
+
+    tabs.addEventListener('click', function(event) {
+      const button = event.target.closest('[data-tab]');
+      if (!button) return;
+
+      const selectedIndex = button.getAttribute('data-tab');
+
+      tabs.querySelectorAll('[data-tab]').forEach(function(tab) {
+        const active = tab.getAttribute('data-tab') === selectedIndex;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+
+      tabs.querySelectorAll('.content-tabs__panel').forEach(function(panel, index) {
+        const active = String(index) === selectedIndex;
+        panel.classList.toggle('is-active', active);
+        panel.hidden = !active;
+      });
+
+      window.dispatchEvent(new Event('resize'));
+    });
+  });
+</script>

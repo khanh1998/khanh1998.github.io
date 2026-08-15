@@ -1,3 +1,42 @@
 .main {
     max-width: 900px;
 }
+
+.content-tabs {
+    border-bottom: 1px solid var(--border);
+    margin: 20px 0 28px;
+    padding-bottom: 18px;
+}
+
+.content-tabs__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin: 0 auto 12px;
+}
+
+.content-tabs__tab {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--entry);
+    color: var(--primary);
+    cursor: pointer;
+    font: inherit;
+    line-height: 1.2;
+    padding: 8px 14px;
+}
+
+.content-tabs__tab:hover,
+.content-tabs__tab.is-active {
+    border-color: var(--primary);
+}
+
+.content-tabs__tab.is-active {
+    background: var(--primary);
+    color: var(--theme);
+}
+
+.content-tabs__panel[hidden] {
+    display: none;
+}

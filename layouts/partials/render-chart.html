@@ -1,0 +1,21 @@
+{{- $chartId := .chartId -}}
+{{- $page := .page -}}
+{{- $site := .site -}}
+{{- $charts := dict -}}
+{{- with $page.Resources.GetMatch "charts.json" -}}
+  {{- $charts = . | transform.Unmarshal -}}
+{{- end -}}
+{{- if eq (len $charts) 0 -}}
+  {{- $charts = $site.Data.charts -}}
+{{- end -}}
+{{- $config := index $charts $chartId -}}
+<div style="position: relative; width: 100%; max-width: 800px; margin: 20px auto;">
+  <canvas id="chart-{{ $chartId }}"></canvas>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('chart-{{ $chartId }}').getContext('2d');
+    const config = {{ $config | jsonify | safeJS }};
+    new Chart(ctx, config);
+  });
+</script>
