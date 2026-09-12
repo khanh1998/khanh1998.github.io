@@ -15,7 +15,7 @@ assert_eq!(*b, 5);
 in the above example, `b` is a reference to `a`, `*b` will return the value that `b` pointing to.
 ## the smart pointers
 ### `Box<T>`
-here is an example of how you can init and modify the value of a Box<T>:
+here is an example of how you can init and modify the value of a `Box<T>`:
 ```rust
 let mut b: Box<i32> = Box::new(6);
 *b = 7;

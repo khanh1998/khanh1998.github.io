@@ -150,6 +150,9 @@ menu:
 pygmentsUseClasses: true
 markup:
   defaultMarkdownHandler: goldmark
+  goldmark:
+    renderer:
+      unsafe: true
   highlight:
     noClasses: false
     anchorLineNos: true

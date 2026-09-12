@@ -8,7 +8,7 @@ However, in this post, I will not explain how floating point works but something
 ...</p></div><footer class=entry-footer><span title='2023-09-10 13:57:02 +0700 +07'>September 10, 2023</span>&nbsp;·&nbsp;5 min&nbsp;·&nbsp;971 words&nbsp;·&nbsp;Khanh Bui</footer><a class=entry-link aria-label="post link to Why would sometimes 0.1 + 0.2 equals to 0.3, but sometimes it’s not in Go" href=http://localhost:1313/posts/go-untyped-constant/></a></article><article class="post-entry tag-entry"><header class=entry-header><h2 class=entry-hint-parent>A Note About Rust Smart Pointer and Deref</h2></header><div class=entry-content><p>this article assumes you have some basic knowledge about Rust smart pointers.
 the dereference (*) operator dereference operator * is used for getting the actual value from a reference:
 1 2 3 let a: i32 = 5; let b: &amp;i32 = &amp;a; assert_eq!(*b, 5); in the above example, b is a reference to a, *b will return the value that b pointing to.
-the smart pointers Box&lt;T> here is an example of how you can init and modify the value of a Box:
+the smart pointers Box&lt;T> here is an example of how you can init and modify the value of a Box&lt;T>:
 ...</p></div><footer class=entry-footer><span title='2022-12-11 13:33:55 +0700 +07'>December 11, 2022</span>&nbsp;·&nbsp;4 min&nbsp;·&nbsp;823 words&nbsp;·&nbsp;Khanh Bui</footer><a class=entry-link aria-label="post link to A Note About Rust Smart Pointer and Deref" href=http://localhost:1313/posts/a-note-about-rust-smart-pointer-and-deref/></a></article></main><footer class=footer><span>&copy; 2026 <a href=http://localhost:1313/>Khanh1998</a></span> ·
 <span>Powered by
 <a href=https://gohugo.io/ rel="noopener noreferrer" target=_blank>Hugo</a> &
