@@ -11,25 +11,25 @@
     </image>
     <generator>Hugo -- 0.163.3</generator>
     <language>en-US</language>
-    <lastBuildDate>Tue, 18 Aug 2026 15:59:06 +0700</lastBuildDate>
+    <lastBuildDate>Sat, 12 Sep 2026 15:39:06 +0700</lastBuildDate>
     <atom:link href="http://localhost:1313/posts/index.xml" rel="self" type="application/rss+xml" />
     <item>
-      <title>Blocking and Non Blocking I/O on Linux: From File Descriptors to epoll</title>
+      <title>Blocking and Non-Blocking I/O on Linux: From File Descriptors to epoll</title>
       <link>http://localhost:1313/posts/blocking-and-non-blocking-io-on-linux/</link>
-      <pubDate>Tue, 18 Aug 2026 15:59:06 +0700</pubDate>
+      <pubDate>Sat, 12 Sep 2026 15:39:06 +0700</pubDate>
       <guid>http://localhost:1313/posts/blocking-and-non-blocking-io-on-linux/</guid>
       <description>&lt;h3 id=&#34;file--file-descriptor&#34;&gt;File &amp;amp; file descriptor&lt;/h3&gt;
 &lt;p&gt;&lt;strong&gt;File&lt;/strong&gt;&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;In Linux, everything is a file - many kernel objects are represented by file descriptors.&lt;/li&gt;
-&lt;li&gt;Beside the regular file, these resources are considered as file: block device, terminal, pipe, socket.&lt;/li&gt;
-&lt;li&gt;A file means it typically can be access by using the file interface: &lt;code&gt;read()&lt;/code&gt;, &lt;code&gt;write()&lt;/code&gt;, &lt;code&gt;close()&lt;/code&gt; and &lt;code&gt;open()&lt;/code&gt;. There are few exceptions where it doesn&amp;rsquo;t support full methods in the interface.&lt;/li&gt;
+&lt;li&gt;In Linux, everything is a file - file descriptors represent many kernel objects.&lt;/li&gt;
+&lt;li&gt;Besides the regular file, these resources are considered as file: block device, terminal, pipe, socket.&lt;/li&gt;
+&lt;li&gt;A file means it typically can be accessed by using the file interface: &lt;code&gt;read()&lt;/code&gt;, &lt;code&gt;write()&lt;/code&gt;, &lt;code&gt;close()&lt;/code&gt; and &lt;code&gt;open()&lt;/code&gt;. There are a few exceptions where it doesn&amp;rsquo;t support full methods in the interface.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;&lt;strong&gt;File descriptor&lt;/strong&gt;&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;File descriptor is an non-negative integer indexing an entry in process&amp;rsquo;s file-descriptor table.&lt;/li&gt;
+&lt;li&gt;A file descriptor is a non-negative integer indexing an entry in a process&amp;rsquo;s file-descriptor table.&lt;/li&gt;
 &lt;li&gt;A file descriptor refers to a &lt;em&gt;open file description&lt;/em&gt;. Multiple file descriptors can refer to the same open file description.&lt;/li&gt;
-&lt;li&gt;A file descriptor is only unique within a process.&lt;/li&gt;
+&lt;li&gt;A file descriptor is unique within a process.&lt;/li&gt;
 &lt;/ul&gt;
 &lt;p&gt;&lt;strong&gt;Open File Description&lt;/strong&gt;&lt;/p&gt;</description>
     </item>
