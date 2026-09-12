@@ -10,27 +10,47 @@
       <link>http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
     </image>
     <generator>Hugo -- 0.163.3</generator>
-    <language>en-us</language>
-    <lastBuildDate>Sat, 11 Jul 2026 14:34:09 +0700</lastBuildDate>
+    <language>en-US</language>
+    <lastBuildDate>Tue, 18 Aug 2026 15:59:06 +0700</lastBuildDate>
     <atom:link href="http://localhost:1313/posts/index.xml" rel="self" type="application/rss+xml" />
     <item>
-      <title>Why Go Has Its Own Scheduler: A Operating-System View</title>
+      <title>Blocking and Non Blocking I/O on Linux: From File Descriptors to epoll</title>
+      <link>http://localhost:1313/posts/blocking-and-non-blocking-io-on-linux/</link>
+      <pubDate>Tue, 18 Aug 2026 15:59:06 +0700</pubDate>
+      <guid>http://localhost:1313/posts/blocking-and-non-blocking-io-on-linux/</guid>
+      <description>&lt;h3 id=&#34;file--file-descriptor&#34;&gt;File &amp;amp; file descriptor&lt;/h3&gt;
+&lt;p&gt;&lt;strong&gt;File&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;In Linux, everything is a file - many kernel objects are represented by file descriptors.&lt;/li&gt;
+&lt;li&gt;Beside the regular file, these resources are considered as file: block device, terminal, pipe, socket.&lt;/li&gt;
+&lt;li&gt;A file means it typically can be access by using the file interface: &lt;code&gt;read()&lt;/code&gt;, &lt;code&gt;write()&lt;/code&gt;, &lt;code&gt;close()&lt;/code&gt; and &lt;code&gt;open()&lt;/code&gt;. There are few exceptions where it doesn&amp;rsquo;t support full methods in the interface.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;File descriptor&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;File descriptor is an non-negative integer indexing an entry in process&amp;rsquo;s file-descriptor table.&lt;/li&gt;
+&lt;li&gt;A file descriptor refers to a &lt;em&gt;open file description&lt;/em&gt;. Multiple file descriptors can refer to the same open file description.&lt;/li&gt;
+&lt;li&gt;A file descriptor is only unique within a process.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;Open File Description&lt;/strong&gt;&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Go Scheduler</title>
       <link>http://localhost:1313/posts/go-runtime/</link>
       <pubDate>Sat, 11 Jul 2026 14:34:09 +0700</pubDate>
       <guid>http://localhost:1313/posts/go-runtime/</guid>
       <description>&lt;blockquote&gt;
-&lt;p&gt;Note: This article describes the runtime at go 1.26.
+&lt;p&gt;Note: This article describes the runtime at Go 1.26.
 These internal details are not part of Go&amp;rsquo;s compatibility guarantee.&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;h2 id=&#34;goals-of-the-go-runtime-scheduler&#34;&gt;Goals of the Go Runtime Scheduler&lt;/h2&gt;
 &lt;ul&gt;
-&lt;li&gt;Minimize os thread overhead (context switch, resources)&lt;/li&gt;
+&lt;li&gt;Minimize OS thread overhead (context switch, resource usage)&lt;/li&gt;
 &lt;li&gt;Support high concurrency&lt;/li&gt;
-&lt;li&gt;Scale across cpu cores for true parallelism&lt;/li&gt;
-&lt;li&gt;Ensure fairness among tasks&lt;/li&gt;
+&lt;li&gt;Scale across CPU cores for true parallelism&lt;/li&gt;
+&lt;li&gt;Ensure fairness among tasks (best-effort)&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h2 id=&#34;architecture&#34;&gt;Architecture&lt;/h2&gt;
-&lt;p&gt;Scheduler isn&amp;rsquo;t a single component, it&amp;rsquo;s a collection of code (algo) and data structures that help the the runtime scheduling works. Its general architecture is described as below diagram.&lt;/p&gt;</description>
+&lt;p&gt;The scheduler isn&amp;rsquo;t a single runtime component. It&amp;rsquo;s a collection of algorithms and data structures that coordinate goroutines, OS threads, processors, timers, network polling, and runtime work. Its general architecture is described in the diagram below.&lt;/p&gt;</description>
     </item>
     <item>
       <title>Postgres Internal Insert Wait</title>
@@ -615,9 +635,10 @@ To read or write any sector, the magnetic head must move to the track that conta
       <guid>http://localhost:1313/posts/floyd-cycle-detection/</guid>
       <description>&lt;p&gt;
   &lt;figure&gt;
-    &lt;img src=&#34;linked-list.png&#34; alt=&#34;&#34;&gt;
+    &lt;img src=&#34;http://localhost:1313/posts/floyd-cycle-detection/linked-list.png&#34; alt=&#34;&#34;&gt;
     &lt;figcaption&gt;a linked list&lt;/figcaption&gt;
   &lt;/figure&gt;
+
 
 If we use two pointers &lt;code&gt;slow&lt;/code&gt; and &lt;code&gt;fast&lt;/code&gt;, the first one moves forward one step at a time, and the second one moves forward two steps at a time. Eventually, the two pointers will meet somewhere. In the above example, they meet at number 9 (or &lt;code&gt;G&lt;/code&gt;).&lt;/p&gt;
 &lt;p&gt;&lt;code&gt;G&lt;/code&gt; is where two-pointers fast and slow meet.&lt;br&gt;
@@ -742,9 +763,10 @@ the word &lt;em&gt;disjoin&lt;/em&gt; means &lt;em&gt;non-overlapping&lt;/em&gt;
 &lt;p&gt;Of course, to establish an SSL, we need a TCP connection first, let’s assume that we have a TCP connection ready.&lt;/p&gt;
 &lt;p&gt;
   &lt;figure&gt;
-    &lt;img src=&#34;ssl-connection.png&#34; alt=&#34;&#34;&gt;
+    &lt;img src=&#34;http://localhost:1313/posts/note-in-ssl-tls/ssl-connection.png&#34; alt=&#34;&#34;&gt;
     &lt;figcaption&gt;How an SSL connection is established&lt;/figcaption&gt;
   &lt;/figure&gt;
+
 &lt;/p&gt;</description>
     </item>
     <item>

@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="1400px" height="900px" viewBox="0 0 1400 900" role="img" aria-labelledby="title description" content="&lt;mxfile host=&quot;app.diagrams.net&quot; modified=&quot;2026-08-23T00:00:00.000Z&quot; agent=&quot;Codex&quot; version=&quot;26.0.16&quot; type=&quot;device&quot;&gt;&lt;diagram id=&quot;blocking-vs-non-blocking&quot; name=&quot;Blocking vs non-blocking I/O&quot;&gt;&lt;mxGraphModel dx=&quot;1400&quot; dy=&quot;900&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; guides=&quot;1&quot; tooltips=&quot;1&quot; connect=&quot;1&quot; arrows=&quot;1&quot; fold=&quot;1&quot; page=&quot;1&quot; pageScale=&quot;1&quot; pageWidth=&quot;1400&quot; pageHeight=&quot;900&quot; math=&quot;0&quot; shadow=&quot;0&quot;&gt;&lt;root&gt;&lt;mxCell id=&quot;0&quot;/&gt;&lt;mxCell id=&quot;1&quot; parent=&quot;0&quot;/&gt;&lt;mxCell id=&quot;title&quot; value=&quot;Blocking vs non-blocking I/O&quot; style=&quot;text;html=1;align=center;verticalAlign=middle;fontSize=30;fontStyle=1;fontColor=#0f172a;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;400&quot; y=&quot;22&quot; width=&quot;600&quot; height=&quot;40&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;subtitle&quot; value=&quot;When the fd is not ready, the calling thread behaves differently&quot; style=&quot;text;html=1;align=center;verticalAlign=middle;fontSize=16;fontColor=#475569;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;350&quot; y=&quot;62&quot; width=&quot;700&quot; height=&quot;30&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;blocking-panel&quot; value=&quot;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;arcSize=4;fillColor=#fff7f7;strokeColor=#fca5a5;strokeWidth=2;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;30&quot; y=&quot;110&quot; width=&quot;650&quot; height=&quot;660&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nonblocking-panel&quot; value=&quot;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;arcSize=4;fillColor=#f6fffa;strokeColor=#86efac;strokeWidth=2;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;720&quot; y=&quot;110&quot; width=&quot;650&quot; height=&quot;660&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;blocking-heading&quot; value=&quot;BLOCKING I/O&quot; style=&quot;text;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;fontColor=#b91c1c;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;235&quot; y=&quot;128&quot; width=&quot;240&quot; height=&quot;32&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nonblocking-heading&quot; value=&quot;NON-BLOCKING I/O&quot; style=&quot;text;html=1;align=center;verticalAlign=middle;fontSize=22;fontStyle=1;fontColor=#15803d;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;900&quot; y=&quot;128&quot; width=&quot;290&quot; height=&quot;32&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;b-app&quot; value=&quot;Application thread&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#60a5fa;fontColor=#1e3a8a;fontStyle=1;fontSize=16;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;110&quot; y=&quot;175&quot; width=&quot;210&quot; height=&quot;50&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;b-kernel&quot; value=&quot;Kernel / I/O source&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#a78bfa;fontColor=#4c1d95;fontStyle=1;fontSize=16;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;425&quot; y=&quot;175&quot; width=&quot;180&quot; height=&quot;50&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-app&quot; value=&quot;Application thread&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#60a5fa;fontColor=#1e3a8a;fontStyle=1;fontSize=16;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;800&quot; y=&quot;175&quot; width=&quot;210&quot; height=&quot;50&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-kernel&quot; value=&quot;Kernel / I/O source&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#a78bfa;fontColor=#4c1d95;fontStyle=1;fontSize=16;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;1115&quot; y=&quot;175&quot; width=&quot;180&quot; height=&quot;50&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;b-blocked&quot; value=&quot;&amp;lt;b&amp;gt;BLOCKED&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;Calling thread sleeps&amp;lt;br&amp;gt;and cannot do other work&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#fee2e2;strokeColor=#ef4444;strokeWidth=2;fontColor=#991b1b;fontSize=16;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;105&quot; y=&quot;315&quot; width=&quot;220&quot; height=&quot;245&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;b-device-wait&quot; value=&quot;&amp;lt;b&amp;gt;Waiting for readiness&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;The read remains blocked&amp;lt;br&amp;gt;&amp;lt;br&amp;gt;The fd becomes readable&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;strokeWidth=2;fontColor=#4c1d95;fontSize=16;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;410&quot; y=&quot;315&quot; width=&quot;210&quot; height=&quot;245&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;b-resume&quot; value=&quot;&amp;lt;b&amp;gt;Thread resumes&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;and processes data&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#22c55e;fontColor=#166534;fontSize=16;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;105&quot; y=&quot;615&quot; width=&quot;220&quot; height=&quot;70&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-work&quot; value=&quot;&amp;lt;b&amp;gt;Thread remains runnable&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;Handles other requests or work&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#22c55e;strokeWidth=2;fontColor=#166534;fontSize=16;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;795&quot; y=&quot;335&quot; width=&quot;220&quot; height=&quot;155&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-device-wait&quot; value=&quot;&amp;lt;b&amp;gt;The fd is not ready&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;No pending read&amp;lt;br&amp;gt;&amp;lt;br&amp;gt;The fd becomes readable later&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#ede9fe;strokeColor=#8b5cf6;strokeWidth=2;fontColor=#4c1d95;fontSize=16;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;1100&quot; y=&quot;335&quot; width=&quot;210&quot; height=&quot;155&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-read-again&quot; value=&quot;read(fd) again&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#3b82f6;fontColor=#1e3a8a;fontStyle=1;fontSize=15;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;825&quot; y=&quot;555&quot; width=&quot;160&quot; height=&quot;50&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-process&quot; value=&quot;&amp;lt;b&amp;gt;Process data&amp;lt;/b&amp;gt;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#22c55e;fontColor=#166534;fontSize=16;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;825&quot; y=&quot;635&quot; width=&quot;160&quot; height=&quot;50&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;b-read-edge&quot; value=&quot;read(fd)&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#2563eb;strokeWidth=2;fontSize=15;fontStyle=1;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;b-app&quot; target=&quot;b-kernel&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;b-return-edge&quot; value=&quot;data ready → return bytes&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#16a34a;strokeWidth=2;fontSize=14;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;b-device-wait&quot; target=&quot;b-resume&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-read-edge&quot; value=&quot;read(fd)&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#2563eb;strokeWidth=2;fontSize=15;fontStyle=1;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;nb-app&quot; target=&quot;nb-kernel&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-eagain-edge&quot; value=&quot;return -1 / EAGAIN immediately&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#f59e0b;strokeWidth=2;fontSize=14;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;nb-kernel&quot; target=&quot;nb-work&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-ready-edge&quot; value=&quot;epoll: fd ready&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#8b5cf6;strokeWidth=2;fontSize=14;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;nb-device-wait&quot; target=&quot;nb-read-again&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-data-edge&quot; value=&quot;return bytes&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#16a34a;strokeWidth=2;fontSize=14;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;nb-kernel&quot; target=&quot;nb-process&quot;&gt;&lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;b-summary&quot; value=&quot;The call waits until it can return data, EOF, or an error.&quot; style=&quot;text;html=1;align=center;verticalAlign=middle;fontSize=15;fontStyle=1;fontColor=#991b1b;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;90&quot; y=&quot;714&quot; width=&quot;530&quot; height=&quot;30&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;nb-summary&quot; value=&quot;When not ready, read returns EAGAIN; epoll avoids busy polling.&quot; style=&quot;text;html=1;align=center;verticalAlign=middle;fontSize=15;fontStyle=1;fontColor=#166534;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;765&quot; y=&quot;714&quot; width=&quot;560&quot; height=&quot;30&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;mxCell id=&quot;footer&quot; value=&quot;&amp;lt;b&amp;gt;Key idea:&amp;lt;/b&amp;gt; non-blocking I/O does not make data arrive sooner—it keeps the caller available while the fd is not ready.&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#93c5fd;fontColor=#1e3a8a;fontSize=17;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;&lt;mxGeometry x=&quot;220&quot; y=&quot;805&quot; width=&quot;960&quot; height=&quot;60&quot; as=&quot;geometry&quot;/&gt;&lt;/mxCell&gt;&lt;/root&gt;&lt;/mxGraphModel&gt;&lt;/diagram&gt;&lt;/mxfile&gt;">
+  <title id="title">Blocking versus non-blocking I/O</title>
+  <desc id="description">Side-by-side timelines showing that blocking I/O puts the calling thread to sleep, while non-blocking I/O returns EAGAIN immediately and lets the thread do other work until epoll reports readiness.</desc>
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/></marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#16a34a"/></marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8b5cf6"/></marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b"/></marker>
+    <style>
+      .heading { font: 700 30px Inter, Helvetica, Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 16px Inter, Helvetica, Arial, sans-serif; fill: #475569; }
+      .panel-title { font: 700 22px Inter, Helvetica, Arial, sans-serif; }
+      .actor { font: 700 16px Inter, Helvetica, Arial, sans-serif; }
+      .label { font: 400 15px Inter, Helvetica, Arial, sans-serif; fill: #334155; }
+      .box-title { font: 700 17px Inter, Helvetica, Arial, sans-serif; }
+      .box-text { font: 400 15px Inter, Helvetica, Arial, sans-serif; }
+      .edge-label { font: 600 14px Inter, Helvetica, Arial, sans-serif; }
+      .summary { font: 700 15px Inter, Helvetica, Arial, sans-serif; }
+      .lifeline { stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 7 7; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="900" rx="18" fill="#ffffff" style="fill:light-dark(#ffffff,#0f172a)"/>
+  <text x="700" y="50" text-anchor="middle" class="heading" style="fill:light-dark(#0f172a,#f8fafc)">Blocking vs non-blocking I/O</text>
+  <text x="700" y="80" text-anchor="middle" class="subtitle" style="fill:light-dark(#475569,#cbd5e1)">When the fd is not ready, the calling thread behaves differently</text>
+
+  <rect x="30" y="110" width="650" height="660" rx="24" fill="#fff7f7" stroke="#fca5a5" stroke-width="2" style="fill:light-dark(#fff7f7,#2a171b);stroke:light-dark(#fca5a5,#7f1d1d)"/>
+  <rect x="720" y="110" width="650" height="660" rx="24" fill="#f6fffa" stroke="#86efac" stroke-width="2" style="fill:light-dark(#f6fffa,#10251a);stroke:light-dark(#86efac,#166534)"/>
+
+  <text x="355" y="151" text-anchor="middle" class="panel-title" fill="#b91c1c" style="fill:light-dark(#b91c1c,#fca5a5)">BLOCKING I/O</text>
+  <text x="1045" y="151" text-anchor="middle" class="panel-title" fill="#15803d" style="fill:light-dark(#15803d,#86efac)">NON-BLOCKING I/O</text>
+
+  <line x1="65" y1="185" x2="65" y2="700" stroke="#64748b" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="54" y="455" text-anchor="middle" class="label" transform="rotate(-90 54 455)" style="fill:light-dark(#475569,#cbd5e1)">time</text>
+  <line x1="755" y1="185" x2="755" y2="700" stroke="#64748b" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="744" y="455" text-anchor="middle" class="label" transform="rotate(-90 744 455)" style="fill:light-dark(#475569,#cbd5e1)">time</text>
+
+  <rect x="110" y="175" width="210" height="50" rx="12" fill="#dbeafe" stroke="#60a5fa" stroke-width="2" style="fill:light-dark(#dbeafe,#172554)"/>
+  <text x="215" y="206" text-anchor="middle" class="actor" fill="#1e3a8a" style="fill:light-dark(#1e3a8a,#bfdbfe)">Application thread</text>
+  <rect x="425" y="175" width="180" height="50" rx="12" fill="#ede9fe" stroke="#a78bfa" stroke-width="2" style="fill:light-dark(#ede9fe,#2e1065)"/>
+  <text x="515" y="206" text-anchor="middle" class="actor" fill="#4c1d95" style="fill:light-dark(#4c1d95,#ddd6fe)">Kernel / I/O source</text>
+  <line x1="215" y1="225" x2="215" y2="700" class="lifeline"/>
+  <line x1="515" y1="225" x2="515" y2="700" class="lifeline"/>
+
+  <line x1="215" y1="268" x2="505" y2="268" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-blue)"/>
+  <rect x="306" y="244" width="108" height="28" rx="8" fill="#ffffff" style="fill:light-dark(#ffffff,#0f172a)"/>
+  <text x="360" y="263" text-anchor="middle" class="edge-label" fill="#1d4ed8" style="fill:light-dark(#1d4ed8,#93c5fd)">read(fd)</text>
+  <text x="515" y="298" text-anchor="middle" class="label" style="fill:light-dark(#475569,#cbd5e1)">data is not ready</text>
+
+  <rect x="105" y="315" width="220" height="245" rx="18" fill="#fee2e2" stroke="#ef4444" stroke-width="2.5" style="fill:light-dark(#fee2e2,#450a0a)"/>
+  <circle cx="215" cy="365" r="22" fill="#ef4444"/>
+  <path d="M 205 355 L 225 375 M 225 355 L 205 375" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+  <text x="215" y="415" text-anchor="middle" class="box-title" fill="#991b1b" style="fill:light-dark(#991b1b,#fecaca)">BLOCKED</text>
+  <text x="215" y="448" text-anchor="middle" class="box-text" fill="#991b1b" style="fill:light-dark(#991b1b,#fecaca)">
+    <tspan x="215" dy="0">Calling thread sleeps</tspan>
+    <tspan x="215" dy="24">and cannot do other work</tspan>
+    <tspan x="215" dy="34" font-size="13">Scheduler may run another thread</tspan>
+  </text>
+
+  <rect x="410" y="315" width="210" height="245" rx="18" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2.5" style="fill:light-dark(#ede9fe,#2e1065)"/>
+  <text x="515" y="370" text-anchor="middle" class="box-title" fill="#4c1d95" style="fill:light-dark(#4c1d95,#ddd6fe)">Waiting for readiness</text>
+  <text x="515" y="407" text-anchor="middle" class="box-text" fill="#5b21b6" style="fill:light-dark(#5b21b6,#c4b5fd)">
+    <tspan x="515" dy="0">The read remains blocked</tspan>
+    <tspan x="515" dy="76">The fd becomes readable</tspan>
+  </text>
+  <circle cx="515" cy="514" r="17" fill="#22c55e"/>
+  <path d="M 507 514 L 513 520 L 524 507" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <line x1="505" y1="590" x2="225" y2="590" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow-green)"/>
+  <rect x="278" y="566" width="175" height="28" rx="8" fill="#ffffff" style="fill:light-dark(#ffffff,#0f172a)"/>
+  <text x="365" y="585" text-anchor="middle" class="edge-label" fill="#15803d" style="fill:light-dark(#15803d,#86efac)">return bytes</text>
+  <rect x="105" y="615" width="220" height="70" rx="16" fill="#dcfce7" stroke="#22c55e" stroke-width="2" style="fill:light-dark(#dcfce7,#052e16)"/>
+  <text x="215" y="645" text-anchor="middle" class="box-title" fill="#166534" style="fill:light-dark(#166534,#bbf7d0)">Thread resumes</text>
+  <text x="215" y="670" text-anchor="middle" class="box-text" fill="#166534" style="fill:light-dark(#166534,#bbf7d0)">and processes data</text>
+  <text x="355" y="733" text-anchor="middle" class="summary" fill="#991b1b" style="fill:light-dark(#991b1b,#fecaca)">The call waits until it can return data, EOF, or an error.</text>
+
+  <rect x="800" y="175" width="210" height="50" rx="12" fill="#dbeafe" stroke="#60a5fa" stroke-width="2" style="fill:light-dark(#dbeafe,#172554)"/>
+  <text x="905" y="206" text-anchor="middle" class="actor" fill="#1e3a8a" style="fill:light-dark(#1e3a8a,#bfdbfe)">Application thread</text>
+  <rect x="1115" y="175" width="180" height="50" rx="12" fill="#ede9fe" stroke="#a78bfa" stroke-width="2" style="fill:light-dark(#ede9fe,#2e1065)"/>
+  <text x="1205" y="206" text-anchor="middle" class="actor" fill="#4c1d95" style="fill:light-dark(#4c1d95,#ddd6fe)">Kernel / I/O source</text>
+  <line x1="905" y1="225" x2="905" y2="700" class="lifeline"/>
+  <line x1="1205" y1="225" x2="1205" y2="700" class="lifeline"/>
+
+  <line x1="905" y1="255" x2="1195" y2="255" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-blue)"/>
+  <rect x="996" y="231" width="108" height="28" rx="8" fill="#ffffff" style="fill:light-dark(#ffffff,#0f172a)"/>
+  <text x="1050" y="250" text-anchor="middle" class="edge-label" fill="#1d4ed8" style="fill:light-dark(#1d4ed8,#93c5fd)">read(fd)</text>
+  <line x1="1195" y1="300" x2="915" y2="300" stroke="#f59e0b" stroke-width="3" marker-end="url(#arrow-amber)"/>
+  <rect x="950" y="276" width="220" height="28" rx="8" fill="#ffffff" style="fill:light-dark(#ffffff,#0f172a)"/>
+  <text x="1060" y="295" text-anchor="middle" class="edge-label" fill="#b45309" style="fill:light-dark(#b45309,#fcd34d)">return −1 / EAGAIN immediately</text>
+
+  <rect x="795" y="335" width="220" height="155" rx="18" fill="#dcfce7" stroke="#22c55e" stroke-width="2.5" style="fill:light-dark(#dcfce7,#052e16)"/>
+  <circle cx="905" cy="375" r="21" fill="#22c55e"/>
+  <path d="M 895 375 L 902 382 L 916 367" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="905" y="418" text-anchor="middle" class="box-title" fill="#166534" style="fill:light-dark(#166534,#bbf7d0)">Thread remains runnable</text>
+  <text x="905" y="450" text-anchor="middle" class="box-text" fill="#166534" style="fill:light-dark(#166534,#bbf7d0)">Handles other requests or work</text>
+
+  <rect x="1100" y="335" width="210" height="155" rx="18" fill="#ede9fe" stroke="#8b5cf6" stroke-width="2.5" style="fill:light-dark(#ede9fe,#2e1065)"/>
+  <text x="1205" y="380" text-anchor="middle" class="box-title" fill="#4c1d95" style="fill:light-dark(#4c1d95,#ddd6fe)">The fd is not ready</text>
+  <text x="1205" y="413" text-anchor="middle" class="box-text" fill="#5b21b6" style="fill:light-dark(#5b21b6,#c4b5fd)">
+    <tspan x="1205" dy="0">No pending read</tspan>
+    <tspan x="1205" dy="42">The fd becomes readable later</tspan>
+  </text>
+  <circle cx="1205" cy="469" r="13" fill="#22c55e"/>
+  <path d="M 1199 469 L 1204 474 L 1212 464" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <line x1="1195" y1="525" x2="915" y2="525" stroke="#8b5cf6" stroke-width="3" marker-end="url(#arrow-purple)"/>
+  <rect x="987" y="501" width="136" height="28" rx="8" fill="#ffffff" style="fill:light-dark(#ffffff,#0f172a)"/>
+  <text x="1055" y="520" text-anchor="middle" class="edge-label" fill="#6d28d9" style="fill:light-dark(#6d28d9,#c4b5fd)">epoll: fd ready</text>
+  <rect x="825" y="555" width="160" height="50" rx="14" fill="#dbeafe" stroke="#3b82f6" stroke-width="2" style="fill:light-dark(#dbeafe,#172554)"/>
+  <text x="905" y="586" text-anchor="middle" class="actor" fill="#1e3a8a" style="fill:light-dark(#1e3a8a,#bfdbfe)">read(fd) again</text>
+  <line x1="985" y1="580" x2="1195" y2="580" stroke="#2563eb" stroke-width="3" marker-end="url(#arrow-blue)"/>
+  <line x1="1195" y1="620" x2="915" y2="620" stroke="#16a34a" stroke-width="3" marker-end="url(#arrow-green)"/>
+  <rect x="1000" y="596" width="115" height="28" rx="8" fill="#ffffff" style="fill:light-dark(#ffffff,#0f172a)"/>
+  <text x="1058" y="615" text-anchor="middle" class="edge-label" fill="#15803d" style="fill:light-dark(#15803d,#86efac)">return bytes</text>
+  <rect x="825" y="645" width="160" height="50" rx="14" fill="#dcfce7" stroke="#22c55e" stroke-width="2" style="fill:light-dark(#dcfce7,#052e16)"/>
+  <text x="905" y="676" text-anchor="middle" class="actor" fill="#166534" style="fill:light-dark(#166534,#bbf7d0)">Process data</text>
+  <text x="1045" y="733" text-anchor="middle" class="summary" fill="#166534" style="fill:light-dark(#166534,#bbf7d0)">When not ready, read returns EAGAIN; epoll avoids busy polling.</text>
+
+  <rect x="220" y="805" width="960" height="60" rx="16" fill="#eff6ff" stroke="#93c5fd" stroke-width="2" style="fill:light-dark(#eff6ff,#172554)"/>
+  <text x="700" y="842" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="17" fill="#1e3a8a" style="fill:light-dark(#1e3a8a,#bfdbfe)">
+    <tspan font-weight="700">Key idea:</tspan><tspan> non-blocking I/O does not make data arrive sooner—it keeps the caller available while the fd is not ready.</tspan>
+  </text>
+</svg>

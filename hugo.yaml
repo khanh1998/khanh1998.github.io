@@ -1,5 +1,5 @@
 baseURL: https://khanh1998.github.io/
-languageCode: en-us
+locale: en-US
 title: Khanh1998
 theme: ["PaperMod"]
 
@@ -7,10 +7,10 @@ defaultContentLanguage: en
 defaultContentLanguageInSubdir: false
 languages:
   en:
-    languageName: English
+    label: English
     weight: 1
   vi:
-    languageName: Tiếng Việt
+    label: Tiếng Việt
     weight: 2
 
 enableRobotsTXT: true
