@@ -1,6 +1,6 @@
 ---
 date: '2026-06-28T12:47:02+07:00'
-draft: false
+draft: true
 title: 'Postgres Internal Insert Wait'
 ---
 
