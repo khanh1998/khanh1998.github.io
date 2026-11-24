@@ -84,7 +84,8 @@ params:
   # home-info mode
   homeInfoParams:
     Title: "Hi there \U0001F44B"
-    Content: I’m a backend-focused software engineer based in Vietnam, with expertise in Go and Postgres. I have a passion for understanding things at a fundamental level, particularly OS, databases and distributed systems.
+    Content: >-
+      I write for the friction: it forces me to turn scattered details into deep mental models of how things work.
 
   socialIcons:
     - name: x
